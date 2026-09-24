@@ -1,4 +1,4 @@
-"""Run after installing skd-backtest; no real data is read at this stage."""
+"""Traverse actual MarketData dates; research and financial modules remain stubs."""
 
 from pprint import pprint
 
@@ -15,7 +15,7 @@ class InferenceModel:
     def predict(self, as_of_date, data):
         print(f"[UserModel.predict] {as_of_date}; shapes="
               f"{ {name: table.shape for name, table in data.items()} }")
-        # 后续在此执行特征处理和预测；本轮空表演示只返回固定输出列。
+        # 每个调仓日调用；后续在此处理真实研究数据，本轮只返回固定输出列。
         return pd.DataFrame(columns=["date", "code", "score"])
 
 

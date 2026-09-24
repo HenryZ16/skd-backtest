@@ -1,8 +1,8 @@
 # skd-backtest
 
 按 [开发规格](BACKTEST_PLATFORM_SPEC_v2.md) 自顶向下搭建的 Python 回测包。
-当前版本是**可安装、可调用的流程骨架**：10 个模块均有独立边界和待实现注释，
-运行时通过 `print` 显示经过的位置。
+当前版本已实现**按真实交易日逐日推进的顶层回测流程**。10 个模块均有独立边界，
+金融算法仍保留待实现注释，并通过 `print` 显示每天经过的位置。
 
 ## 安装与运行
 
@@ -34,7 +34,7 @@ def inference(as_of_date, data):
 
 engine = BacktestEngine(
     data_dir=r"D:\Data",             # 必须显式传入，不硬编码机器路径
-    start_date="2024-01-02",         # YYYY-MM-DD，最终时段按两端包含设计
+    start_date="2024-01-02",         # YYYY-MM-DD，区间两端包含
     end_date="2024-12-31",
     inference=inference,
     initial_cash=1_000_000,
@@ -48,6 +48,7 @@ engine = BacktestEngine(
 metrics = engine.run()
 print(metrics)                       # 15 项指标，目前全部为 None
 print(engine.metrics)                # 同一份指标
+print(engine.trading_dates)          # 区间内实际遍历的全部交易日
 print(engine.tables["equity_curve"]) # 带固定列名的空审计表
 ```
 
@@ -68,22 +69,32 @@ metrics = engine.run()
 `pandas.DataFrame`。引擎不负责动态导入模型、不重新初始化模型，也不执行训练。
 当前真实模型需要能处理空表才能跑演示；示例提供了可直接运行的空推理函数。
 
-## 本轮执行语义
+## 执行语义
 
-`run()` 只进行一次流程演示，使用 `start_date` 作为推理日期标签。
-它**不读取 Parquet、不生成真实交易日、不遍历回测区间、不撮合、不计算指标、
-不写结果文件**。配置项已传递到对应模块，但金融规则尚未生效。
-下一执行日用 `None` 表示尚未确定，不将自然日加一冒充下一交易日。
-各模块打印 `STUB`，指标 `None` 表示未计算，不表示收益率为零。
+`run()` 从区间涉及的每个月度 MarketData Parquet 文件中只读取“日期”列，
+按 `[start_date, end_date]` 过滤、去重并排序，然后遍历**每个实际交易日**。
+周末、节假日由数据中的真实日期决定，不使用自然日或普通工作日推算。
+每个月的日期列只读一次，不在每日循环中重复加载。
 
-流程为：配置 → 数据准备 → as-of 空表 → 用户 inference → 目标组合 →
-下一开盘占位 → 公司行为 → 交易及费用 → 收盘估值 → 事后 RankIC → 指标 → 输出占位。
-未来的真实循环将在每日开盘执行前一信号日的目标，每日收盘估值，调仓日收盘生成新目标。
-标签只能由评价器使用，不能进入模型和优化器。
+每个交易日按以下顺序调用：
 
-只依赖 pandas，以保持推理与审计表接口和规格一致；暂不引入 Parquet、求解器或
-机器学习依赖。信任调用者和数据格式，不逐行验证、不重复检查、不捕获和重试错误。
-inference 抛出的异常直接交给调用者。
+1. 公司行为、开盘市场状态、账户日初处理（预留每日 T+1 解锁）。
+2. 若前一交易日生成了目标，调用 Broker 在本日开盘执行，随后清除待执行目标。
+3. 收盘估值，包括首日、末日和所有非调仓日。
+4. 调仓日收盘提供 as-of 空表，调用 inference 和 Optimizer，目标排到下一交易日开盘。
+
+调仓日从区间内第一个交易日起每隔 `rebalance_interval` 个交易日选取。
+末日没有区间内的下一交易日，因此只处理已有目标及估值，不生成新的调仓目标。
+只有一个交易日时仍运行日初和估值；没有交易日时跳过每日循环，仍返回完整指标结构。
+
+每日结果先收集，循环结束后一次性合并为审计表，再进行事后 RankIC 评价、
+指标计算和结果输出。未来收益标签只供评价器使用，不能进入模型和优化器。
+金融模块仍打印 `STUB`：研究表、交易表和估值表为空，尚不撮合、不计算金融指标、
+不写结果文件。指标 `None` 表示未计算，不表示收益率为零。
+
+依赖 pandas 和用于读取交易日列的 pyarrow，暂不引入求解器或机器学习依赖。
+信任调用者和数据格式，不逐行验证、不重复检查、不捕获和重试错误。
+文件读取和 inference 异常直接交给调用者。
 
 ## 数据约定
 
@@ -110,7 +121,7 @@ inference 抛出的异常直接交给调用者。
 - `raw_price` 的接口已保留；严格股数/现金交易实现需补齐上述数据。
   不用复权价冒充真实成交价，也不从 `amount/volume` 推造开盘价。
 
-这些差异不阻碍本次空流程演示；数据补充布局在实现真实交易前确定。
+这些差异不阻碍交易日循环及金融模块占位调用；数据补充布局在实现真实交易前确定。
 
 ## 构造配置
 
@@ -131,7 +142,7 @@ inference 抛出的异常直接交给调用者。
 | 设计模块 | 文件 | 待实现内容 |
 |---|---|---|
 | Submission Runner | `submission_runner.py` | 已直连句柄；模型由用户初始化 |
-| Data Provider | `data_provider.py` | 月度加载、真实日历、PIT/as-of、数据缓存 |
+| Data Provider | `data_provider.py` | 已读取真实交易日；待实现研究数据加载、PIT/as-of、缓存 |
 | Prediction Evaluator | `prediction_evaluator.py` | 标签、逐日 RankIC |
 | Portfolio Optimizer | `portfolio_optimizer.py` | 排名变换、Top-K/tilt、约束优化 |
 | Broker / Execution Engine | `broker.py` | T+1、整手/零股、涨跌停、先卖后买、实际账户 |
@@ -141,8 +152,8 @@ inference 抛出的异常直接交给调用者。
 | Metrics | `metrics.py` | 预测和组合原始指标 |
 | Result Writer | `result_writer.py` | JSON、CSV、运行日志 |
 
-下一步先实现 Data Provider 和真实时间循环，再逐个补全预测评价、组合构建、
-交易、会计、指标及文件输出；不在当前阶段提前实现这些算法。
+下一步实现 Data Provider 的研究数据与标签读取，再逐个补全预测评价、组合构建、
+交易、会计、指标及文件输出。
 
 ## 返回指标与审计输出
 
@@ -168,7 +179,8 @@ inference 抛出的异常直接交给调用者。
 
 `engine.tables` 包含规格的七张审计表：`predictions`、`rankic`、`target_weights`、
 `orders`、`trades`、`positions`、`equity_curve`。当前只保留 inference 实际返回的
-预测记录，并为 `future_return` 填 `None`，其他表为空。每次 `run()` 重置运行状态。
+所有调仓日的预测记录，并为 `future_return` 填 `None`，其他表为空。
+每日模块输出会统一汇总，后续实现模块时无需修改汇总机制。每次 `run()` 重置运行状态。
 
 Result Writer 预留 `metrics.json`、以上七个 `.csv` 和 `run.log`。
 即使指定 `output_dir`，当前也只打印计划输出的文件名，不创建文件或目录。
@@ -181,4 +193,5 @@ uv build
 ```
 
 也可先安装 `build`，再执行 `python -m build`，生成 wheel 和源码分发包。
-测试仅验证骨架的公共接口、调用顺序、结果结构、重复运行和异常直传。
+测试使用临时月度 Parquet，验证跨月/跨年日期筛选、每日调用顺序、非调仓日估值、
+下一开盘执行、末日边界、单日及无交易日区间、审计汇总、重复运行和异常直传。

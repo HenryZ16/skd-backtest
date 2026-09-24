@@ -7,7 +7,7 @@ class CostModel:
     def __init__(self, config: CostConfig):
         self.config = config
 
-    def calculate(self, *, date: str | None, side: str | None,
+    def calculate(self, *, date: str, side: str | None,
                   trade_value: float | None) -> dict[str, float | None]:
         # TODO: 按 date 选择生效费率，计算佣金/最低佣金、卖出印花税、过户费。
         # Broker 按买卖方向将 slippage 应用于开盘价；不得全历史写死同一税率。

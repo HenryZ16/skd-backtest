@@ -17,12 +17,16 @@ class Broker:
             "portfolio_value": initial_cash,
         }
 
-    def execute(self, *, date: str | None, target_weights: pd.DataFrame,
+    def start_day(self, *, date: str, account: dict) -> None:
+        # TODO: 每个交易日日初释放昨日买入股数为 sellable_shares，落实 T+1。
+        # 无调仓日也必须处理，不依赖 execute 是否被调用。
+        print(f"[Broker.start_day] STUB date={date}; settle T+1")
+
+    def execute(self, *, date: str, target_weights: pd.DataFrame,
                 market: pd.DataFrame, account: dict, cost_model: CostModel,
                 price_mode: str) -> tuple[pd.DataFrame, pd.DataFrame]:
         print(f"[Broker.execute] STUB date={date}, mode={price_mode}; no orders executed")
-        # TODO: 交易日开始释放昨日买入股数为 sellable_shares，落实 T+1。
-        # 开盘检查停牌/有效价格/涨跌停；读取 PIT 限价，不能硬编码 +/-10%。
+        # TODO: 开盘检查停牌/有效价格/涨跌停；读取 PIT 限价，不能硬编码 +/-10%。
         print("[Broker.tradability] STUB T+1 / suspension / price limits")
         # TODO: raw_price: equity * target_weight / raw_open -> 股数差 -> 整手。
         # 买入按 100 股整手，卖出允许剩余零股清仓，不超过可卖数量。

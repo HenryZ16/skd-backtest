@@ -11,7 +11,7 @@ class PortfolioAccounting:
         print("[PortfolioAccounting.current_weights] STUB actual holdings")
         return pd.DataFrame(columns=["code", "weight"])
 
-    def mark_to_market(self, *, date: str | None, account: dict,
+    def mark_to_market(self, *, date: str, account: dict,
                        market: pd.DataFrame, price_mode: str) -> tuple[pd.DataFrame, pd.DataFrame]:
         # TODO: 每个交易日估值，包括非调仓日；停牌持仓保留并沿用最近有效价格。
         # raw_price: market_value = sum(shares * raw_close), equity = cash + market_value。

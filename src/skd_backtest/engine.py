@@ -1,4 +1,4 @@
-"""Top-down composition root. This release runs one skeleton walkthrough."""
+"""Daily backtest control flow with placeholder financial modules."""
 
 from pathlib import Path
 from typing import Literal
@@ -15,6 +15,7 @@ from .metrics import Metrics
 from .portfolio_optimizer import PortfolioOptimizer
 from .prediction_evaluator import PredictionEvaluator
 from .result_writer import ResultWriter
+from .schemas import RESULT_COLUMNS, empty_result
 from .submission_runner import Inference, SubmissionRunner
 
 
@@ -57,51 +58,66 @@ class BacktestEngine:
         self.metrics: dict[str, float | int | None] | None = None
         self.tables: dict[str, pd.DataFrame] = {}
         self.account: dict = {}
+        self.trading_dates: list[str] = []
 
     def run(self) -> dict[str, float | int | None]:
-        """Walk through every module once; return all 15 uncalculated metrics."""
-        print("[BacktestEngine.run] SKELETON ONLY: one walkthrough, no real backtest")
+        """Visit every trading day; financial calculations remain placeholders."""
+        print("[BacktestEngine.run] daily loop; financial modules are STUBs")
         self.metrics = None
         self.tables = {}
+        self.trading_dates = []
         self.account = self.broker.initialize(self.config.initial_cash)
-        self.data_provider.prepare()
+        self.trading_dates = self.data_provider.prepare()
+        records = {name: [] for name in RESULT_COLUMNS}
+        pending_targets = None
 
-        # TODO: 用真实交易日日历替代本次单次演示。每日先公司行为/开盘执行昨日
-        # 目标，再收盘估值；调仓日收盘提供 as-of 数据并产生下一交易日待执行目标。
-        # 非调仓日仍估值；末日没有区间内下一交易日时不再产生可执行调仓。
-        # 当前 start_date 只是演示标签，不声称它是交易日；end_date 仅存入配置。
-        signal_date = self.config.start_date
-        execution_date = None  # 由未来的真实日历确定，不能伪造为自然日 + 1。
+        for day_index, date in enumerate(self.trading_dates):
+            print(f"[BacktestEngine.day] {date}")
+            self.corporate_actions.apply(
+                date=date, actions=self.data_provider.corporate_actions(date),
+                account=self.account, price_mode=self.config.price_mode,
+            )
+            market = self.data_provider.open_market(date)
+            self.broker.start_day(date=date, account=self.account)
+            # None 表示无待执行调仓；空目标表仍然是一次已排期的优化结果。
+            if pending_targets is not None:
+                orders, trades = self.broker.execute(
+                    date=date, target_weights=pending_targets, market=market,
+                    account=self.account, cost_model=self.cost_model, price_mode=self.config.price_mode,
+                )
+                records["orders"].append(orders)
+                records["trades"].append(trades)
+                pending_targets = None
 
-        research_data = self.data_provider.as_of(signal_date)
-        scores = self.submission_runner.predict(signal_date, research_data)
-        portfolio_inputs = self.data_provider.portfolio_inputs(signal_date)
-        targets = self.optimizer.optimize(
-            scores=scores, **portfolio_inputs,
-            current_weights=self.accounting.current_weights(self.account),
-        )
-        self.tables["target_weights"] = targets
+            positions, equity = self.accounting.mark_to_market(
+                date=date, account=self.account,
+                market=self.data_provider.close_market(date), price_mode=self.config.price_mode,
+            )
+            records["positions"].append(positions)
+            records["equity_curve"].append(equity)
 
-        print("[BacktestEngine.next_open] STUB transition to the next trading day's open")
-        self.corporate_actions.apply(
-            date=execution_date, actions=self.data_provider.corporate_actions(execution_date),
-            account=self.account, price_mode=self.config.price_mode,
-        )
-        self.tables["orders"], self.tables["trades"] = self.broker.execute(
-            date=execution_date, target_weights=targets,
-            market=self.data_provider.open_market(execution_date), account=self.account,
-            cost_model=self.cost_model, price_mode=self.config.price_mode,
-        )
-        self.tables["positions"], self.tables["equity_curve"] = self.accounting.mark_to_market(
-            date=execution_date, account=self.account,
-            market=self.data_provider.close_market(execution_date), price_mode=self.config.price_mode,
-        )
+            # 从区间首个真实交易日起按交易日计数；末日仅估值，不产生区间外调仓。
+            if day_index % self.config.rebalance_interval == 0 and day_index + 1 < len(self.trading_dates):
+                scores = self.submission_runner.predict(date, self.data_provider.as_of(date))
+                records["predictions"].append(scores)
+                pending_targets = self.optimizer.optimize(
+                    scores=scores, **self.data_provider.portfolio_inputs(date),
+                    current_weights=self.accounting.current_weights(self.account),
+                ).assign(signal_date=date, execution_date=self.trading_dates[day_index + 1])
+                records["target_weights"].append(pending_targets)
+
+        # 循环结束后统一拼接，避免逐日复制不断增长的审计表。
+        self.tables = {
+            name: pd.concat(parts, ignore_index=True) if parts else empty_result(name)
+            for name, parts in records.items()
+        }
 
         # 标签只在事后评估阶段读取，与模型/优化器的输入隔离。
         self.tables["predictions"], self.tables["rankic"] = self.prediction_evaluator.evaluate(
-            scores=scores, future_returns=self.data_provider.future_returns(self.config.holding_period),
+            scores=self.tables["predictions"],
+            future_returns=self.data_provider.future_returns(self.config.holding_period),
         )
         self.metrics = self.metrics_calculator.calculate(self.tables)
         self.result_writer.write(metrics=self.metrics, tables=self.tables)
-        print("[BacktestEngine.run] skeleton walkthrough complete")
+        print(f"[BacktestEngine.run] completed {len(self.trading_dates)} trading days; metrics remain STUBs")
         return self.metrics
