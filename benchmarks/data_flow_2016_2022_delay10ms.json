@@ -1,0 +1,713 @@
+{
+  "created_at_utc": "2026-09-24T11:23:38.163692+00:00",
+  "environment": {
+    "python": "3.13.13",
+    "pandas": "3.0.6",
+    "pyarrow": "25.0.1",
+    "psutil": "7.2.2",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "logical_cpus": 32
+  },
+  "config": {
+    "data_dir": "D:\\Data",
+    "start_date": "2016-01-01",
+    "end_date": "2022-12-31",
+    "lookback": 252,
+    "rebalance_interval": 5,
+    "read_batch_months": 12,
+    "repeats": 3,
+    "scope": "both",
+    "inference_delay_ms": 10.0,
+    "memory_sample_ms": 10
+  },
+  "dataset": {
+    "files": 252,
+    "bytes": 158772790,
+    "sha256": "e83c2a319d355bce8d065f8b460120ea49414b2e1480cb1b6c01ed98e5ebf70f"
+  },
+  "method": "One warmup per scope/mode; alternating order; median of repeats; OS cache not flushed. Each run uses a fresh subprocess; startup/import time and parent manifest hashing are excluded. Memory covers run_once including engine setup and teardown: total process RSS (Windows working set), including the loaded runtime, native allocations and all threads, sampled at memory_sample_ms. Peak is the sampled maximum; mean is the time-weighted trapezoidal estimate. Sampling may miss short peaks; actual gaps are reported. Sampling overhead is included. Framework DEBUG logs disabled; worker JSON output and per-run console summaries occur after measurement. Both scopes include signal checks/hashes and mock inference; data scope also touches daily prices. Engine scope includes pre-trade open and daily close accounting stubs and audit collection; data scope calls no financial modules. Financial algorithms remain unimplemented. Sleep models only overlap opportunity.",
+  "identical_playback": true,
+  "summary": {
+    "data": {
+      "sync": {
+        "elapsed_seconds": 12.00675080000292,
+        "playback_seconds": 12.00675080000292,
+        "inference_seconds": 4.886457700009487,
+        "days_per_second": 141.83687396923287,
+        "source_rows_per_second": 140868.75193575173,
+        "calendar_seconds": 0.12906120000116061,
+        "read_seconds": 1.725164900006348,
+        "wait_seconds": 1.7285581000032835,
+        "as_of_seconds": 1.5393132000172045,
+        "market_seconds": 2.812544300009904,
+        "peak_rss_mib": 575.02734375,
+        "mean_rss_mib": 405.22645097192805
+      },
+      "async": {
+        "elapsed_seconds": 11.23439689999941,
+        "playback_seconds": 11.23439689999941,
+        "inference_seconds": 5.086253399982525,
+        "days_per_second": 151.5880216053333,
+        "source_rows_per_second": 150553.34212022444,
+        "calendar_seconds": 0.13298500000018976,
+        "read_seconds": 2.311815500001103,
+        "wait_seconds": 0.21501529999659397,
+        "as_of_seconds": 1.7138819999636326,
+        "market_seconds": 3.1159910000642412,
+        "peak_rss_mib": 584.57421875,
+        "mean_rss_mib": 472.6424809186369
+      }
+    },
+    "engine": {
+      "sync": {
+        "elapsed_seconds": 12.53457989999879,
+        "playback_seconds": 12.47655510000186,
+        "inference_seconds": 4.8764548000071954,
+        "days_per_second": 135.86414651201548,
+        "source_rows_per_second": 134936.79193828933,
+        "calendar_seconds": 0.12914319999981672,
+        "read_seconds": 1.719416200008709,
+        "wait_seconds": 1.7227998999951524,
+        "as_of_seconds": 1.5597222999895166,
+        "market_seconds": 2.811948900067364,
+        "peak_rss_mib": 575.82421875,
+        "mean_rss_mib": 406.3573320435693
+      },
+      "async": {
+        "elapsed_seconds": 11.738990500001819,
+        "playback_seconds": 11.686970399998245,
+        "inference_seconds": 5.130957700039289,
+        "days_per_second": 145.07209968350654,
+        "source_rows_per_second": 144081.89528731094,
+        "calendar_seconds": 0.12933090000296943,
+        "read_seconds": 2.3526503999964916,
+        "wait_seconds": 0.21294569999736268,
+        "as_of_seconds": 1.75474600000598,
+        "market_seconds": 3.0339054999021755,
+        "peak_rss_mib": 576.6640625,
+        "mean_rss_mib": 469.19244445847
+      }
+    }
+  },
+  "runs": [
+    {
+      "scope": "engine",
+      "market_checksum": null,
+      "mode": "async",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 11.749114300000656,
+      "playback_seconds": 11.692038599998341,
+      "inference_seconds": 5.130957700039289,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 144.94709613982604,
+      "source_rows_per_second": 143957.7449680531,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.12686670000039157,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 2.3580125000007683,
+        "wait_seconds": 0.21334729999944102,
+        "as_of_seconds": 1.7602454999505426,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 3.0295898001677415
+      },
+      "memory": {
+        "peak_rss_bytes": 604676096,
+        "mean_rss_bytes": 495075497.19669914,
+        "sample_count": 743,
+        "duration_seconds": 11.766920300000493,
+        "max_sample_gap_seconds": 0.05281689999901573
+      },
+      "process_id": 58512
+    },
+    {
+      "scope": "engine",
+      "market_checksum": null,
+      "mode": "sync",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 12.56461329999729,
+      "playback_seconds": 12.501288999999815,
+      "inference_seconds": 4.8764548000071954,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 135.53938822775925,
+      "source_rows_per_second": 134614.25032478833,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.13237419999859412,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 1.719416200008709,
+        "wait_seconds": 1.7227998999951524,
+        "as_of_seconds": 1.5597222999895166,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 2.8277106000568892
+      },
+      "memory": {
+        "peak_rss_bytes": 603795456,
+        "mean_rss_bytes": 426096545.8049177,
+        "sample_count": 807,
+        "duration_seconds": 12.584666799997649,
+        "max_sample_gap_seconds": 0.03101539999988745
+      },
+      "process_id": 18684
+    },
+    {
+      "scope": "data",
+      "market_checksum": "0e6eacee132ad19d72c0e60f8a2822721edd76c345c40aa41e21d720137c7378",
+      "mode": "async",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 11.23439689999941,
+      "playback_seconds": 11.23439689999941,
+      "inference_seconds": 5.086253399982525,
+      "consumer_seconds": 0.3123522999303532,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 151.5880216053333,
+      "source_rows_per_second": 150553.34212022444,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.13298500000018976,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 2.311815500001103,
+        "wait_seconds": 0.21704920000047423,
+        "as_of_seconds": 1.7138819999636326,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 3.1159910000642412
+      },
+      "memory": {
+        "peak_rss_bytes": 616660992,
+        "mean_rss_bytes": 497245458.8454863,
+        "sample_count": 720,
+        "duration_seconds": 11.235020699998131,
+        "max_sample_gap_seconds": 0.047217600000294624
+      },
+      "process_id": 41296
+    },
+    {
+      "scope": "data",
+      "market_checksum": "0e6eacee132ad19d72c0e60f8a2822721edd76c345c40aa41e21d720137c7378",
+      "mode": "sync",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 11.938797999999224,
+      "playback_seconds": 11.938797999999224,
+      "inference_seconds": 4.882362000025751,
+      "consumer_seconds": 0.2638046999745711,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 142.6441757369637,
+      "source_rows_per_second": 141670.5433830198,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.12906120000116061,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 1.6925045999960275,
+        "wait_seconds": 1.6959146000008332,
+        "as_of_seconds": 1.5314721999966423,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 2.7959561000898248
+      },
+      "memory": {
+        "peak_rss_bytes": 602959872,
+        "mean_rss_bytes": 424260079.3928797,
+        "sample_count": 761,
+        "duration_seconds": 11.939650100001018,
+        "max_sample_gap_seconds": 0.03401759999906062
+      },
+      "process_id": 24176
+    },
+    {
+      "scope": "data",
+      "market_checksum": "0e6eacee132ad19d72c0e60f8a2822721edd76c345c40aa41e21d720137c7378",
+      "mode": "sync",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 12.00675080000292,
+      "playback_seconds": 12.00675080000292,
+      "inference_seconds": 4.8878053999942495,
+      "consumer_seconds": 0.2690264000193565,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 141.83687396923287,
+      "source_rows_per_second": 140868.75193575173,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.13229299999875366,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 1.725164900006348,
+        "wait_seconds": 1.7285581000032835,
+        "as_of_seconds": 1.5515745999873616,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 2.815951499982475
+      },
+      "memory": {
+        "peak_rss_bytes": 607735808,
+        "mean_rss_bytes": 424910731.0543404,
+        "sample_count": 769,
+        "duration_seconds": 12.007437300002493,
+        "max_sample_gap_seconds": 0.03099579999980051
+      },
+      "process_id": 38992
+    },
+    {
+      "scope": "data",
+      "market_checksum": "0e6eacee132ad19d72c0e60f8a2822721edd76c345c40aa41e21d720137c7378",
+      "mode": "async",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 11.280269599999883,
+      "playback_seconds": 11.280269599999883,
+      "inference_seconds": 5.131965799988393,
+      "consumer_seconds": 0.31770400007007993,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 150.97156897739552,
+      "source_rows_per_second": 149941.09715250225,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.13304760000028182,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 2.3544881000016176,
+        "wait_seconds": 0.21364680000260705,
+        "as_of_seconds": 1.6811648000148125,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 3.128143300054944
+      },
+      "memory": {
+        "peak_rss_bytes": 612970496,
+        "mean_rss_bytes": 495601562.0717406,
+        "sample_count": 722,
+        "duration_seconds": 11.280853399999614,
+        "max_sample_gap_seconds": 0.03504539999994449
+      },
+      "process_id": 58012
+    },
+    {
+      "scope": "engine",
+      "market_checksum": null,
+      "mode": "sync",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 12.53457989999879,
+      "playback_seconds": 12.47655510000186,
+      "inference_seconds": 4.876893900029245,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 135.86414651201548,
+      "source_rows_per_second": 134936.79193828933,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.12893070000063744,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 1.730070400000841,
+        "wait_seconds": 1.7333754999999655,
+        "as_of_seconds": 1.5424893000090378,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 2.811948900067364
+      },
+      "memory": {
+        "peak_rss_bytes": 615579648,
+        "mean_rss_bytes": 427964025.6968495,
+        "sample_count": 799,
+        "duration_seconds": 12.553827400002774,
+        "max_sample_gap_seconds": 0.03555120000237366
+      },
+      "process_id": 56324
+    },
+    {
+      "scope": "engine",
+      "market_checksum": null,
+      "mode": "async",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 11.695361300000513,
+      "playback_seconds": 11.639026799999556,
+      "inference_seconds": 5.049110100004327,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 145.61328686783924,
+      "source_rows_per_second": 144619.38854338136,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.13022500000079162,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 2.323924000003899,
+        "wait_seconds": 0.21166489999450278,
+        "as_of_seconds": 1.75474600000598,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 3.0600269001806737
+      },
+      "memory": {
+        "peak_rss_bytes": 594288640,
+        "mean_rss_bytes": 485196154.3711292,
+        "sample_count": 750,
+        "duration_seconds": 11.71266359999936,
+        "max_sample_gap_seconds": 0.031468900000618305
+      },
+      "process_id": 55440
+    },
+    {
+      "scope": "engine",
+      "market_checksum": null,
+      "mode": "async",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 11.738990500001819,
+      "playback_seconds": 11.686970399998245,
+      "inference_seconds": 5.150032300003659,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 145.07209968350654,
+      "source_rows_per_second": 144081.89528731094,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.12933090000296943,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 2.3526503999964916,
+        "wait_seconds": 0.21294569999736268,
+        "as_of_seconds": 1.720485399961035,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 3.0339054999021755
+      },
+      "memory": {
+        "peak_rss_bytes": 609652736,
+        "mean_rss_bytes": 491983936.64048463,
+        "sample_count": 747,
+        "duration_seconds": 11.755948399997578,
+        "max_sample_gap_seconds": 0.03134919999865815
+      },
+      "process_id": 58076
+    },
+    {
+      "scope": "engine",
+      "market_checksum": null,
+      "mode": "sync",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 12.517320399998425,
+      "playback_seconds": 12.460721700001159,
+      "inference_seconds": 4.874204700001428,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 136.05148271192405,
+      "source_rows_per_second": 135122.84945587977,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.12914319999981672,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 1.7098609999993641,
+        "wait_seconds": 1.7131374000055075,
+        "as_of_seconds": 1.5600362999939534,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 2.7893394999446173
+      },
+      "memory": {
+        "peak_rss_bytes": 587157504,
+        "mean_rss_bytes": 424498653.30319613,
+        "sample_count": 800,
+        "duration_seconds": 12.53608929999973,
+        "max_sample_gap_seconds": 0.03146109999943292
+      },
+      "process_id": 59972
+    },
+    {
+      "scope": "data",
+      "market_checksum": "0e6eacee132ad19d72c0e60f8a2822721edd76c345c40aa41e21d720137c7378",
+      "mode": "async",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 11.148128000000725,
+      "playback_seconds": 11.148128000000725,
+      "inference_seconds": 5.076852100020915,
+      "consumer_seconds": 0.2953012000398303,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 152.76107342864105,
+      "source_rows_per_second": 151718.3871588028,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.12608170000021346,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 2.3090952999991714,
+        "wait_seconds": 0.21501529999659397,
+        "as_of_seconds": 1.7727532000026258,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 3.020267200037779
+      },
+      "memory": {
+        "peak_rss_bytes": 605401088,
+        "mean_rss_bytes": 492129708.40513587,
+        "sample_count": 712,
+        "duration_seconds": 11.148954100000992,
+        "max_sample_gap_seconds": 0.030832999997073784
+      },
+      "process_id": 58844
+    },
+    {
+      "scope": "data",
+      "market_checksum": "0e6eacee132ad19d72c0e60f8a2822721edd76c345c40aa41e21d720137c7378",
+      "mode": "sync",
+      "signal_data_sha256": "42b86cf180623c2619c5056b34e23b230d17784a97d1d4a84b43a9e8e57ef045",
+      "first_trading_date": "2016-01-04",
+      "last_trading_date": "2022-12-30",
+      "prediction_rows": 102300,
+      "elapsed_seconds": 12.009133399998973,
+      "playback_seconds": 12.009133399998973,
+      "inference_seconds": 4.886457700009487,
+      "consumer_seconds": 0.265185999985988,
+      "inference_calls": 341,
+      "trading_days": 1703,
+      "market_rows": 803524,
+      "days_per_second": 141.8087336759991,
+      "source_rows_per_second": 140840.80371695635,
+      "data": {
+        "calendar_files": 84,
+        "calendar_seconds": 0.12899900000047637,
+        "data_files": 252,
+        "data_bytes": 158772790,
+        "batches": 7,
+        "read_seconds": 1.733434199999465,
+        "wait_seconds": 1.7370139000049676,
+        "as_of_seconds": 1.5393132000172045,
+        "source_rows": {
+          "Factor33_winsor": 590238,
+          "Barra_factor": 510900,
+          "MarketData": 590238
+        },
+        "delivered_rows": {
+          "Factor33_winsor": 23851800,
+          "Barra_factor": 23851800,
+          "MarketData": 23851800
+        },
+        "warmup_days": 0,
+        "seed_files": 0,
+        "seed_rows": 0,
+        "open_rows": 803524,
+        "close_rows": 803524,
+        "market_seconds": 2.812544300009904
+      },
+      "memory": {
+        "peak_rss_bytes": 595869696,
+        "mean_rss_bytes": 428064724.61780035,
+        "sample_count": 770,
+        "duration_seconds": 12.009996100001445,
+        "max_sample_gap_seconds": 0.031058399999892572
+      },
+      "process_id": 5492
+    }
+  ]
+}

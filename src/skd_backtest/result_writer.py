@@ -1,10 +1,15 @@
-"""Future audit-file output boundary; currently prints the intended files."""
+"""Future audit-file output boundary; currently logs the intended files at DEBUG."""
+
+import logging
 
 from pathlib import Path
 
 import pandas as pd
 
 from .schemas import RESULT_COLUMNS
+
+
+logger = logging.getLogger(__name__)
 
 
 class ResultWriter:
@@ -15,6 +20,7 @@ class ResultWriter:
         # TODO: output_dir 配置后写 metrics.json、七张审计 CSV 和 run.log。
         # 字段由 RESULT_COLUMNS 定义，保持 score -> target -> order -> trade -> NAV 审计链。
         # JSON 中 None 写为 null；没有输出目录时仅返回内存结果。当前完全不写文件。
-        files = ["metrics.json", *(f"{name}.csv" for name in RESULT_COLUMNS), "run.log"]
-        print(f"[ResultWriter.write] STUB output_dir={self.output_dir}; no files written")
-        print(f"[ResultWriter.files] {', '.join(files)}")
+        logger.debug("[ResultWriter.write] STUB output_dir=%s; no files written", self.output_dir)
+        if logger.isEnabledFor(logging.DEBUG):
+            files = ["metrics.json", *(f"{name}.csv" for name in RESULT_COLUMNS), "run.log"]
+            logger.debug("[ResultWriter.files] %s", ", ".join(files))

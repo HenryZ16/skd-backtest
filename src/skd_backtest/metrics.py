@@ -1,5 +1,7 @@
 """All raw metrics required by the specification, without invented values."""
 
+import logging
+
 import pandas as pd
 
 METRIC_NAMES = (
@@ -8,6 +10,9 @@ METRIC_NAMES = (
     "annualized_volatility", "maximum_drawdown", "tracking_error",
     "information_ratio", "sharpe_ratio", "turnover", "transaction_cost", "failed_orders",
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class Metrics:
@@ -22,5 +27,5 @@ class Metrics:
         # TE = std(active) * sqrt(N), IR = mean(active) / std(active) * sqrt(N)。
         # 从实际成交/订单汇总换手、费用及失败订单；零方差等未定义指标保留 None。
         # 仅输出原始指标；赛制层决定排行榜权重，不在此实现私榜加权。
-        print("[Metrics.calculate] STUB all 15 metrics are None (not calculated)")
+        logger.debug("[Metrics.calculate] STUB all 15 metrics are None (not calculated)")
         return dict.fromkeys(METRIC_NAMES)

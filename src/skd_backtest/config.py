@@ -1,6 +1,7 @@
-"""Configuration only: no validation or financial calculations."""
+"""Backtest configuration and playback bounds."""
 
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -48,3 +49,13 @@ class BacktestConfig:
     trading_days_per_year: int
     risk_free_rate: float
     output_dir: Path | None
+    read_batch_months: int = 12
+    prefetch: bool = True
+
+    def __post_init__(self):
+        if date.fromisoformat(self.start_date) > date.fromisoformat(self.end_date):
+            raise ValueError("start_date must not be after end_date")
+        for name in ("lookback", "rebalance_interval", "holding_period", "read_batch_months"):
+            value = getattr(self, name)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                raise ValueError(f"{name} must be a positive integer")
