@@ -46,7 +46,7 @@ engine = BacktestEngine(
     prefetch=True,                   # 后台预取下一批行情
     async_inference=True,            # 独立推理线程；False 使用同步推理
     price_mode="adjusted_return",
-    optimizer_config=OptimizerConfig(top_k=50),
+    optimizer_config=OptimizerConfig(top_k=300),  # 沪深300全部成分股等权目标
     cost_config=CostConfig(slippage=0.0),
 )
 metrics = engine.run()
@@ -73,7 +73,9 @@ metrics = engine.run()
 句柄必须接受 `as_of_date`、`data` 两个关键字参数，返回 `date/code/score` 三列的
 `pandas.DataFrame`。Runner 会验证当日日期、有限数值分数、代码唯一及完整覆盖当日合法池，
 然后按代码排序并发布缓存。传入回调时，模型实例由调用者创建与管理；平台不执行训练。
-示例按当日 Barra 成分返回零分，仅演示数据通路。历史不足时提供已有数据，模型自行处理短窗口。
+示例使用 naive 模型，为当日 Barra 表中的全部沪深300成分股统一返回零分；
+`top_k=300` 为300只成分股生成各 `1/300` 的等权目标，实际持仓受停牌等交易限制影响。
+历史不足时提供已有数据，模型自行处理短窗口。
 
 默认模型在独立线程按信号日期顺序调用，可在账户处理当前调仓期间计算下一信号日。
 模型始终只接收对应日期的研究数据；账户在 Optimizer 需要当日分数时等待，缓存只由主线程访问。

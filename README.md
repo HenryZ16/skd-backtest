@@ -19,6 +19,8 @@ python examples/basic_usage.py
 ```
 
 [示例](examples/basic_usage.py) 通过 `engine.run()` 运行回测流程，默认读取 `D:\Data`，运行 2016–2022 年区间；
+naive 模型为当日全部沪深300成分股统一输出零分，`top_k=300` 生成每只股票 `1/300` 的等权目标。
+每5个交易日生成调仓信号，下一交易日开盘执行；实际持仓受停牌等交易限制影响。
 运行前请将示例中的 `data_dir` 改为实际数据目录。
 
 接入自己的模型时，将已初始化模型的 `model.predict` 作为 `inference` 传给
