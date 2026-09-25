@@ -1,0 +1,199 @@
+{
+  "source": "current",
+  "mode": "no_clone",
+  "end": "2016-12-31",
+  "prefetch": true,
+  "wall_seconds": 2.903082600001653,
+  "process_cpu_seconds": 2.859375,
+  "main_thread_cpu_seconds": 2.640625,
+  "process_cpu_over_wall": 0.9849444173577326,
+  "main_thread_cpu_over_wall": 0.9095934783249007,
+  "rss_peak_mib": 285.57421875,
+  "rss_mean_mib": 252.07623453407214,
+  "io_read_bytes": 25831549,
+  "io_write_bytes": 0,
+  "performance": {
+    "elapsed_seconds": 2.902992199997243,
+    "playback_seconds": 2.8370214000024134,
+    "inference_seconds": 0.09611099999165162,
+    "inference_calls": 49,
+    "trading_days": 244,
+    "market_rows": 85836,
+    "days_per_second": 84.05120757824693,
+    "source_rows_per_second": 84351.5873036905,
+    "data": {
+      "calendar_files": 12,
+      "calendar_seconds": 0.041642800002591684,
+      "data_files": 36,
+      "data_bytes": 22585830,
+      "batches": 1,
+      "read_seconds": 0.2156230000036885,
+      "wait_seconds": 0.21435960000235355,
+      "as_of_seconds": 0.12982620000548195,
+      "source_rows": {
+        "Factor33_winsor": 85836,
+        "Barra_factor": 73200,
+        "MarketData": 85836
+      },
+      "delivered_rows": {
+        "Factor33_winsor": 1778700,
+        "Barra_factor": 1778700,
+        "MarketData": 1778700
+      },
+      "warmup_days": 0,
+      "seed_files": 0,
+      "seed_rows": 0,
+      "open_rows": 85836,
+      "close_rows": 85836,
+      "market_seconds": 0.4141600000075414
+    }
+  },
+  "outputs": {
+    "predictions": {
+      "rows": 14700,
+      "columns": [
+        "date",
+        "code",
+        "score",
+        "future_return"
+      ],
+      "sha256": "7a9919aabd71de4cbcc65d71c76dd4631730fc93e6b34fd05fda7bb462fab409"
+    },
+    "rankic": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "rankic",
+        "n_stocks"
+      ],
+      "sha256": "ece6c06e464952bb299cea027b7daac0ac31ee7f858f43e70c2dbe9eca40d114"
+    },
+    "target_weights": {
+      "rows": 0,
+      "columns": [
+        "signal_date",
+        "execution_date",
+        "code",
+        "score",
+        "benchmark_weight",
+        "target_weight"
+      ],
+      "sha256": "6794dbe7a2d9285948a5e87ff440c8ad877e2b86c5fd6889e0f995de71c04a06"
+    },
+    "orders": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "side",
+        "requested_shares",
+        "status",
+        "reject_reason",
+        "order_id",
+        "signal_date",
+        "requested_value",
+        "filled_shares",
+        "filled_value"
+      ],
+      "sha256": "397b8bf3928223d125c28493d5ef709c9c2d256e72d6cf72714ccd1a3513b503"
+    },
+    "trades": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "side",
+        "shares",
+        "price",
+        "trade_value",
+        "commission",
+        "stamp_tax",
+        "other_cost",
+        "total_cost",
+        "order_id",
+        "signal_date",
+        "position_value"
+      ],
+      "sha256": "97a6f81655619f26f1de5d393e6af571c0727117e4672501d65f3fd4f11f9dec"
+    },
+    "positions": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "shares",
+        "sellable_shares",
+        "close",
+        "market_value",
+        "weight"
+      ],
+      "sha256": "7ec7d63ef86f77b988ccadc9c62115f15eb977d1abab19059d27e7b74f81303f"
+    },
+    "equity_curve": {
+      "rows": 244,
+      "columns": [
+        "date",
+        "cash",
+        "market_value",
+        "portfolio_value",
+        "portfolio_nav",
+        "portfolio_return",
+        "benchmark_nav",
+        "benchmark_return",
+        "active_return",
+        "turnover",
+        "transaction_cost"
+      ],
+      "sha256": "f30799aea6a5bb376d01d05eace3792379d48ef425027a89a39506ab0a794a83"
+    }
+  },
+  "metrics": {
+    "mean_rankic": null,
+    "rankic_std": null,
+    "rankic_ir": null,
+    "positive_rankic_ratio": null,
+    "total_return": null,
+    "annualized_return": null,
+    "annualized_excess_return": null,
+    "annualized_volatility": null,
+    "maximum_drawdown": null,
+    "tracking_error": null,
+    "information_ratio": null,
+    "sharpe_ratio": null,
+    "turnover": null,
+    "transaction_cost": null,
+    "failed_orders": null
+  },
+  "inventory": {},
+  "clone_schemas": {},
+  "environment": {
+    "python": "3.13.13",
+    "pandas": "3.0.6",
+    "pyarrow": "25.0.1",
+    "psutil": "7.2.2",
+    "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "logical_cpus": 32,
+    "platform": "Windows-11-10.0.26200-SP0"
+  },
+  "head": "94e22c7aa4100955e1606c2cec632a7fd41a9ca9",
+  "source_sha256": {
+    "__init__.py": "1cd17c99f9103369d6deda77677981d04344dab16dc814b1a1f03d7f5c59afa0",
+    "accounting.py": "f2bb6347163ee7f65134f364f1823455e6470553e8768a578a5771f4234db46b",
+    "broker.py": "655236e9faed65df0c37fd2508e36ce0ba1af6adbe27b631cedca63ea6b1a306",
+    "config.py": "d35374705b03aa2fa10323dbd58020ffe23c5540e8ed92e35a12421796a6bf2f",
+    "contracts.py": "173932af34fa2e9a022b2c10ead1b7b6212245dd33c74c62b32fe197f7463244",
+    "corporate_actions.py": "9392c87ad16b9084ec29b56f6c3dd3bd42e7ab983eed22feca0dc19b8792f60d",
+    "cost_model.py": "86ec63e5592bc4db4675f0c8dc99c2dbd91af23c93b667958f82fc0d00f82a6b",
+    "data_provider.py": "6589b4f5b55cb004f69a99886edcb59a341bf98a8b6049da3539ebc5f49c6743",
+    "engine.py": "958d77d36aa6cdcddba012cad9a6c59a4d649e49127420cb8cb237bcb3f31346",
+    "label_provider.py": "f88420970d44ec03c32a73d2d689200617d6e141d2cb2740080c1a2ac8b139c5",
+    "metrics.py": "3c4138d9bb9ab292583ea9cc01820f991f7f7a0e0239ffe6d4fd13f00fca378b",
+    "portfolio_optimizer.py": "bc8d20a12a4149ccb90451c0bdd8fdb4d25711e96d1f93d4caf8df0d565ea3a4",
+    "prediction_evaluator.py": "ab24d9575d2c8f942f1e7707bf10208e935e8b8803e36a42e07281d5f26e31e7",
+    "reference_data.py": "7547609ad2080a7663d7853a73c49e3643c5c6f169fc41e600900bdf0d00a215",
+    "result_writer.py": "7ce8ecc1a1308493744611d7db4ec28cfa816de6127f2fb6012ce8a7c084c7c6",
+    "runtime_cache.py": "93c18dd896e5e435bd71d21389001eaf52d0799f2260eb040e71fcbc84cee919",
+    "schemas.py": "c18b79e331f1ac28df9a00331ce4ee2e49a900e8326420139c8e0bc5c2023218",
+    "submission_runner.py": "40c4e4ad7d61afadbab459d4940e25da9ac8ee65588236b36e5f3b116da66d47"
+  }
+}

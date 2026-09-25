@@ -13,6 +13,7 @@ from pandas.testing import assert_frame_equal
 
 from skd_backtest import BacktestEngine
 from skd_backtest.schemas import SOURCE_COLUMNS
+from protocol_support import protocol_components
 
 
 class DataFlowTest(unittest.TestCase):
@@ -49,7 +50,11 @@ class DataFlowTest(unittest.TestCase):
     def make_engine(self, **kwargs):
         config = dict(
             data_dir=self.root, start_date="2016-12-01", end_date="2017-03-02",
-            inference=lambda **kw: pd.DataFrame(columns=["date", "code", "score"]),
+            inference=lambda as_of_date, data: pd.DataFrame({
+                "date": as_of_date, "score": 0.0,
+                "code": data["Barra_factor"].loc[
+                    lambda frame: frame["日期"] == int(as_of_date.replace("-", "")), "代码"],
+            }),
             lookback=4, read_batch_months=1, rebalance_interval=1,
         )
         config.update(kwargs)
@@ -151,7 +156,7 @@ class DataFlowTest(unittest.TestCase):
 
         engine.submission_runner.inference = inference
         try:
-            with (redirect_stdout(StringIO()),
+            with (protocol_components(engine), redirect_stdout(StringIO()),
                   patch.object(engine.data_provider, "_read_batch", side_effect=load),
                   self.assertRaisesRegex(RuntimeError, "model failed")):
                 engine.run()
@@ -160,8 +165,8 @@ class DataFlowTest(unittest.TestCase):
         self.assertTrue(all(name.startswith("skd-data") for name in reader_names))
         self.assertFalse(any(thread.name.startswith("skd-data") for thread in threads()))
         self.assertIsNone(engine.metrics)
-        with redirect_stdout(StringIO()):
-            engine.submission_runner.inference = lambda **kw: pd.DataFrame(columns=["date", "code", "score"])
+        with protocol_components(engine), redirect_stdout(StringIO()):
+            engine.submission_runner.inference = self.make_engine().submission_runner.inference
             engine.run()
         self.assertEqual(engine.performance["data"]["batches"], 4)
 
@@ -176,7 +181,7 @@ class DataFlowTest(unittest.TestCase):
                         raise OSError("broken parquet")
                     return original(path, **kwargs)
 
-                with (self.subTest(month=month, prefetch=prefetch), redirect_stdout(StringIO()),
+                with (self.subTest(month=month, prefetch=prefetch), protocol_components(engine), redirect_stdout(StringIO()),
                       patch("pandas.read_parquet", side_effect=read),
                       self.assertRaisesRegex(OSError, "broken parquet")):
                     engine.run()
@@ -248,7 +253,7 @@ class DataFlowTest(unittest.TestCase):
         engine = self.make_engine()
         with (patch.object(engine.accounting, "mark_to_market", side_effect=AssertionError("valuation")),
               patch.object(engine.accounting, "mark_at_open", side_effect=AssertionError("open valuation")),
-              patch.object(engine.broker, "initialize", side_effect=AssertionError("broker")),
+              patch.object(engine.broker, "start_day", side_effect=AssertionError("broker")),
               closing(engine.data_provider.playback()) as days):
             first = next(days)
             self.assertEqual(first.date, "2016-12-01")

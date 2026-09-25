@@ -1,4 +1,4 @@
-"""Empty table contracts; source column names match D:\\Data."""
+"""Shared source, packet and result table columns."""
 
 import pandas as pd
 
@@ -30,10 +30,12 @@ RESULT_COLUMNS = {
         "signal_date", "execution_date", "code", "score",
         "benchmark_weight", "target_weight",
     ),
-    "orders": ("date", "code", "side", "requested_shares", "status", "reject_reason"),
+    "orders": ("date", "code", "side", "requested_shares", "status", "reject_reason",
+               "order_id", "signal_date", "requested_value", "filled_shares", "filled_value"),
     "trades": (
         "date", "code", "side", "shares", "price", "trade_value",
         "commission", "stamp_tax", "other_cost", "total_cost",
+        "order_id", "signal_date", "position_value",
     ),
     "positions": ("date", "code", "shares", "sellable_shares", "close", "market_value", "weight"),
     "equity_curve": (
@@ -46,3 +48,25 @@ RESULT_COLUMNS = {
 
 def empty_result(name: str) -> pd.DataFrame:
     return pd.DataFrame(columns=RESULT_COLUMNS[name])
+
+
+SCORE_COLUMNS = ("date", "code", "score")
+STATE_COLUMNS = {
+    "raw_price": ("code", "total_shares", "sellable_shares", "reference_price", "reference_date"),
+    "adjusted_return": ("code", "position_value", "reference_price", "reference_date"),
+}
+LOCK_COLUMNS = ("code", "shares", "unlock_date", "reason")
+VALUE_COLUMNS = ("code", "price", "price_date", "market_value")
+WEIGHT_COLUMNS = ("code", "weight")
+ACTION_COLUMNS = (
+    "event_id", "code", "action", "known_date", "known_phase", "effective_date", "record_date",
+    "cash_per_share", "share_ratio", "subscription_price", "sellable_date", "reference_price_after_action",
+)
+EVENT_COLUMNS = ("event_id", "date", "code", "record_shares", "cash_delta", "shares_delta", "status", "reason")
+LABEL_COLUMNS = ("date", "code", "entry_date", "exit_date", "future_return", "label_price_basis", "missing_reason")
+METRIC_NAMES = (
+    "mean_rankic", "rankic_std", "rankic_ir", "positive_rankic_ratio",
+    "total_return", "annualized_return", "annualized_excess_return",
+    "annualized_volatility", "maximum_drawdown", "tracking_error",
+    "information_ratio", "sharpe_ratio", "turnover", "transaction_cost", "failed_orders",
+)

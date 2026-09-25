@@ -1,16 +1,17 @@
-"""Exercise the real daily loop with small monthly Parquet calendars."""
+"""Verify the engine's cache wiring using explicit financial component doubles."""
 
-from contextlib import redirect_stdout
-from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Event, current_thread, get_ident, enumerate as threads
+import json
 import unittest
 from unittest.mock import patch
 
 import pandas as pd
 
-from skd_backtest import BacktestEngine, CostConfig, FeeScheduleEntry, OptimizerConfig
-from skd_backtest.schemas import RESULT_COLUMNS, SOURCE_COLUMNS
+from skd_backtest import BacktestEngine
+from skd_backtest.schemas import METRIC_NAMES, RESULT_COLUMNS, SOURCE_COLUMNS
+from protocol_support import protocol_components
 
 
 class SkeletonTest(unittest.TestCase):
@@ -18,16 +19,15 @@ class SkeletonTest(unittest.TestCase):
         directory = TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
-        # Repeated, unsorted dates with rows outside the selected range.
         for month, dates in {
-            "201712": [20171229, 20171228, 20171229],
-            "201801": [20180109, 20180105, 20180102, 20180108, 20180103, 20180104, 20180102],
+            "201712": [20171229, 20171228],
+            "201801": [20180109, 20180105, 20180102, 20180108, 20180103, 20180104],
         }.items():
             for name, columns in SOURCE_COLUMNS.items():
                 folder = self.root / name / month[:4] / month[4:]
                 folder.mkdir(parents=True)
                 rows = []
-                for day in dict.fromkeys(dates):
+                for day in dates:
                     for code in ("SH600000", "SZ000001"):
                         row = dict.fromkeys(columns, 1.0)
                         row.update(日期=day, 代码=code, 名称=code)
@@ -38,200 +38,268 @@ class SkeletonTest(unittest.TestCase):
 
     def inference(self, *, as_of_date, data):
         self.calls.append(as_of_date)
-        self.assertEqual(set(data), set(SOURCE_COLUMNS))
-        for name, table in data.items():
-            self.assertEqual(tuple(table.columns), SOURCE_COLUMNS[name])
-            self.assertFalse(table.empty)
-            self.assertLessEqual(table["日期"].max(), int(as_of_date.replace("-", "")))
-        return pd.DataFrame([{"date": as_of_date, "code": "SH600000", "score": 1.0}])
+        for frame in data.values():
+            self.assertLessEqual(frame["日期"].max(), int(as_of_date.replace("-", "")))
+        return pd.DataFrame({"date": as_of_date, "code": ["SH600000", "SZ000001"], "score": [1.0, 2.0]})
 
     def make_engine(self, **kwargs):
-        config = dict(
-            data_dir=self.root, start_date="2017-12-30", end_date="2018-01-08",
-            inference=self.inference, rebalance_interval=2,
-        )
+        config = dict(data_dir=self.root, start_date="2017-12-30", end_date="2018-01-08",
+                      inference=self.inference, rebalance_interval=2)
         config.update(kwargs)
         return BacktestEngine(**config)
 
-    def test_daily_calendar_order_and_repeat_run(self):
-        optimizer = OptimizerConfig(top_k=30, turnover_limit=0.2)
-        costs = CostConfig(fee_schedule=(FeeScheduleEntry("2018-01-01", 0.0, 0.0),))
-        engine = self.make_engine(
-            initial_cash=123.0, holding_period=20, lookback=60,
-            optimizer_config=optimizer, cost_config=costs, output_dir=self.root / "result",
-        )
-        with (self.assertLogs("skd_backtest", level="DEBUG") as output,
-              patch("pandas.read_parquet", wraps=pd.read_parquet) as read):
+    def test_daily_calendar_cache_wiring_and_repeat_run(self):
+        engine = self.make_engine(initial_cash=123.0)
+        with protocol_components(engine) as trace, patch("pandas.read_parquet", wraps=pd.read_parquet) as read:
             metrics = engine.run()
-
-        self.assertEqual(engine.trading_dates, self.dates)
-        self.assertEqual(self.calls, ["2018-01-02", "2018-01-04"])
-        self.assertEqual(read.call_count, 8)  # Two calendars and three datasets x two months.
-        self.assertEqual(sum(call.kwargs["columns"] == ["日期"] for call in read.call_args_list), 2)
-        self.assertEqual(engine.performance["trading_days"], 5)
-        self.assertEqual(engine.performance["market_rows"], 10)
-        self.assertEqual(engine.performance["data"]["data_files"], 6)
-        self.assertEqual(set(metrics), {
-            "mean_rankic", "rankic_std", "rankic_ir", "positive_rankic_ratio",
-            "total_return", "annualized_return", "annualized_excess_return",
-            "annualized_volatility", "maximum_drawdown", "tracking_error",
-            "information_ratio", "sharpe_ratio", "turnover", "transaction_cost", "failed_orders",
-        })
-        self.assertTrue(all(value is None for value in metrics.values()))
-        self.assertIs(engine.metrics, metrics)
-        self.assertIs(engine.optimizer.config, optimizer)
-        self.assertIs(engine.cost_model.config, costs)
-        self.assertEqual((engine.config.holding_period, engine.config.lookback), (20, 60))
-        self.assertEqual(engine.account["cash"], 123.0)
-        self.assertEqual(engine.account["total_shares"], {})
-        self.assertEqual(set(engine.tables), set(RESULT_COLUMNS))
-        self.assertEqual(engine.tables["predictions"]["date"].tolist(), self.calls)
-        self.assertTrue(engine.tables["predictions"]["future_return"].isna().all())
-
-        trace = "\n".join(record.getMessage() for record in output.records)
-        execution_dates = {"2018-01-03", "2018-01-05"}
-        for date in self.dates:
-            day_trace = trace.split(f"[BacktestEngine.day] {date}\n")[1].split("[BacktestEngine.day]")[0]
-            stages = ["CorporateActionEngine.apply", "Broker.start_day", "PortfolioAccounting.mark_at_open"]
-            if date in execution_dates:
-                stages += ["Broker.execute", "Broker.sell_orders", "CostModel.calculate", "Broker.buy_orders"]
-            else:
-                self.assertNotIn("[Broker.execute]", day_trace)
-            stages += ["PortfolioAccounting.mark_to_market"]
-            if date in self.calls:
-                stages += ["SubmissionRunner.predict", "PortfolioAccounting.current_weights", "PortfolioOptimizer.optimize"]
-            offsets = [day_trace.index(f"[{stage}]") for stage in stages]
-            self.assertEqual(offsets, sorted(offsets))
-        self.assertEqual(trace.count("[PortfolioAccounting.mark_at_open]"), len(self.dates))
-        self.assertEqual(trace.count("[PortfolioAccounting.mark_to_market]"), len(self.dates))
-        self.assertEqual(trace.count("[DataProvider.close_market]"), len(self.dates))
-        self.assertLess(trace.rindex("[BacktestEngine.day]"), trace.index("[DataProvider.future_returns]"))
-        self.assertEqual(trace.count("[Metrics.calculate]"), 1)
-        self.assertEqual(trace.count("[ResultWriter.write]"), 1)
-        self.assertFalse((self.root / "result").exists())
-
-        engine.account["cash"] = -1
-        with (patch("builtins.print", side_effect=AssertionError("framework must not print")),
-              self.assertNoLogs("skd_backtest", level="WARNING")):
-            second = engine.run()
-        self.assertEqual(self.calls, ["2018-01-02", "2018-01-04"] * 2)
-        self.assertEqual(engine.account["cash"], 123.0)
-        self.assertEqual(second, metrics)
-        self.assertEqual(len(engine.tables["predictions"]), 2)
-
-    def test_daily_signals_next_open_and_audit_accumulation(self):
-        engine = self.make_engine(rebalance_interval=1)
-
-        def row(name, **values):
-            return pd.DataFrame([values], columns=RESULT_COLUMNS[name])
-
-        def optimize(**kwargs):
-            date = kwargs["scores"]["date"].iloc[0]
-            expected_equity = 20.0 + self.dates.index(date)
-            self.assertEqual(engine.account["valuation_at"], (date, "close"))
-            self.assertEqual(kwargs["current_weights"]["weight"].tolist(), [expected_equity / 100.0])
-            return row("target_weights", code="SH600000", target_weight=1.0)
-
-        def mark_at_open(*, date, account, market, price_mode):
-            self.assertIs(account, engine.account)
-            self.assertEqual(price_mode, "adjusted_return")
-            self.assertEqual(set(market), {
-                "date", "code", "adjusted_open", "is_suspended", "is_missing",
-                "previous_close", "previous_close_date",
-            })
-            self.assertEqual(market["date"].unique().tolist(), [date])
-            self.assertTrue((market["previous_close_date"].dropna() < int(date.replace("-", ""))).all())
-            # Deliberately different open/close values detect stale or misordered state forwarding.
-            account["portfolio_value"] = 10.0 + self.dates.index(date)
-            account["valuation_at"] = (date, "open")
-
-        def execute(**kwargs):
-            date = kwargs["date"]
-            account = kwargs["account"]
-            self.assertIs(account, engine.account)
-            self.assertEqual(account["valuation_at"], (date, "open"))
-            self.assertEqual(account["portfolio_value"], 10.0 + self.dates.index(date))
-            self.assertNotIn("adjusted_close", kwargs["market"])
-            targets = kwargs["target_weights"]
-            previous = self.dates[self.dates.index(date) - 1]
-            self.assertEqual(targets["signal_date"].tolist(), [previous])
-            self.assertEqual(targets["execution_date"].tolist(), [date])
-            account["cash"] -= 1.0
-            return row("orders", date=date), row("trades", date=date)
-
-        def mark_to_market(*, date, account, market, price_mode):
-            self.assertIs(account, engine.account)
-            self.assertEqual(price_mode, "adjusted_return")
-            self.assertEqual(market["date"].unique().tolist(), [date])
-            self.assertIn("adjusted_close", market)
-            self.assertIn("reference_close", market)
-            self.assertNotIn("adjusted_open", market)
-            self.assertEqual(account["cash"], engine.config.initial_cash - self.dates.index(date))
-            account["portfolio_value"] = 20.0 + self.dates.index(date)
-            account["valuation_at"] = (date, "close")
-            return (row("positions", date=date),
-                    row("equity_curve", date=date, cash=account["cash"], portfolio_value=account["portfolio_value"]))
-
-        def current_weights(account):
-            self.assertIs(account, engine.account)
-            self.assertEqual(account["valuation_at"][1], "close")
-            return pd.DataFrame({"code": ["SH600000"], "weight": [account["portfolio_value"] / 100.0]})
-
-        with (patch("builtins.print", side_effect=AssertionError("framework must not print")),
-              patch.object(engine.optimizer, "optimize", side_effect=optimize),
-              patch.object(engine.broker, "execute", side_effect=execute),
-              patch.object(engine.accounting, "mark_at_open", side_effect=mark_at_open),
-              patch.object(engine.accounting, "current_weights", side_effect=current_weights),
-              patch.object(engine.accounting, "mark_to_market", side_effect=mark_to_market)):
+            self.assertEqual(read.call_count, 8)  # prepare followed by playback does not repeat the calendar.
+            self.assertEqual(engine.trading_dates, self.dates)
+            self.assertEqual(self.calls, ["2018-01-02", "2018-01-04"])
+            self.assertEqual(set(metrics), set(METRIC_NAMES))
+            self.assertEqual(set(engine.tables), set(RESULT_COLUMNS))
+            self.assertEqual(engine.tables["equity_curve"].date.tolist(), self.dates)
+            self.assertEqual(engine.tables["predictions"].date.tolist(),
+                             ["2018-01-02"] * 2 + ["2018-01-04"] * 2)
+            self.assertEqual([item for item in trace if item[0] == "target"],
+                             [("target", "2018-01-02", "2018-01-03"), ("target", "2018-01-04", "2018-01-05")])
+            for date in self.dates:
+                indices = [trace.index((name, date)) for name in ("actions", "settle", "open", "execute", "close")]
+                self.assertEqual(indices, sorted(indices))
+            self.assertGreater(trace.index(("labels",)), trace.index(("close", self.dates[-1])))
+            first = engine.tables["predictions"].copy()
+            engine.account["cash"] = -1
             engine.run()
+            self.assertEqual(engine.account["cash"], 123.0)
+            pd.testing.assert_frame_equal(engine.tables["predictions"], first)
+        self.assertIsNone(engine.data_provider._executor)
 
-        self.assertEqual(self.calls, self.dates[:-1])
-        for name in ("orders", "trades"):
-            self.assertEqual(engine.tables[name]["date"].tolist(), self.dates[1:])
-        for name in ("positions", "equity_curve"):
-            self.assertEqual(engine.tables[name]["date"].tolist(), self.dates)
-        self.assertEqual(engine.tables["equity_curve"]["portfolio_value"].tolist(), [20., 21., 22., 23., 24.])
-        self.assertEqual(engine.tables["target_weights"]["execution_date"].tolist(), self.dates[1:])
+    def test_default_placeholders_complete_without_component_replacements(self):
+        for prefetch, output in ((False, None), (True, self.root / "placeholder-output")):
+            with self.subTest(prefetch=prefetch):
+                self.calls.clear()
+                engine = self.make_engine(initial_cash=123.0, prefetch=prefetch, output_dir=output)
+                metrics = engine.run()
+                self.assertEqual(metrics, dict.fromkeys(METRIC_NAMES))
+                self.assertEqual(engine.trading_dates, self.dates)
+                self.assertEqual(self.calls, ["2018-01-02", "2018-01-04"])
+                self.assertEqual(engine.account["cash"], 123.0)
+                self.assertEqual(engine.account["portfolio_value"], 123.0)
+                self.assertEqual(len(engine.tables["predictions"]), 4)
+                self.assertTrue(engine.tables["predictions"].future_return.isna().all())
+                for name in ("rankic", "target_weights", "orders", "trades", "positions"):
+                    self.assertTrue(engine.tables[name].empty, name)
+                self.assertEqual(engine.tables["equity_curve"].date.tolist(), self.dates)
+                self.assertTrue(engine.tables["equity_curve"].portfolio_nav.isna().all())
+                self.assertTrue(engine.tables["equity_curve"].portfolio_return.isna().all())
+                self.assertGreater(engine.performance["elapsed_seconds"], 0)
+                self.assertIsNone(engine.data_provider._executor)
+                if output is None:
+                    self.assertEqual(engine.run(), metrics)
+                else:
+                    records = [json.loads(line) for line in (output / "run.log").read_text(encoding="utf-8").splitlines()]
+                    self.assertTrue(any("STUB" in record["message"] for record in records))
+                    self.assertEqual(records[-1]["message"], "run completed")
+                    self.assertEqual({path.name for path in output.iterdir()}, {"run.log"})
 
-    def test_single_day_and_no_trading_days(self):
-        for start, end, expected in [
+    def test_sync_and_async_inference_match_with_both_read_modes(self):
+        for prefetch in (False, True):
+            with self.subTest(prefetch=prefetch):
+                baseline = self.make_engine(prefetch=prefetch, async_inference=False, rebalance_interval=1)
+                baseline.run()
+                actual = self.make_engine(prefetch=prefetch, async_inference=True, rebalance_interval=1)
+                actual.run()
+                self.assertEqual(actual.metrics, baseline.metrics)
+                self.assertEqual(actual.account, baseline.account)
+                self.assertEqual(actual.trading_dates, baseline.trading_dates)
+                self.assertEqual(actual.performance["inference_calls"], baseline.performance["inference_calls"])
+                self.assertEqual(baseline.performance["inference_wait_seconds"], 0.0)
+                for name in RESULT_COLUMNS:
+                    pd.testing.assert_frame_equal(actual.tables[name], baseline.tables[name])
+                self.assertFalse(any(t.name.startswith(("skd-infer", "skd-data")) for t in threads()))
+
+    def test_inference_overlaps_accounting_and_next_rebalance_with_bounded_inputs(self):
+        first_started, first_opened = Event(), Event()
+        next_started, execution_started = Event(), Event()
+        owner = get_ident()
+        model_threads, prepared = [], []
+        engine = self.make_engine()
+        first, execution, second = self.dates[:3]
+        original_open = engine.accounting.mark_at_open
+        original_optimize = engine.optimizer.optimize
+        original_execute = engine.broker.execute
+        original_as_of = engine.data_provider.as_of
+
+        def inference(*, as_of_date, data):
+            self.assertNotEqual(get_ident(), owner)
+            model_threads.append(current_thread().name)
+            if as_of_date == first:
+                first_started.set()
+                self.assertTrue(first_opened.wait(5), "current-day accounting could not overlap prediction")
+            else:
+                next_started.set()
+                self.assertTrue(execution_started.wait(5), "next prediction blocked current execution")
+            return self.inference(as_of_date=as_of_date, data=data)
+
+        def prepare(date):
+            prepared.append(date)
+            return original_as_of(date)
+
+        def open_mark(*, date, market, cache):
+            self.assertEqual(get_ident(), owner)
+            if date == first:
+                self.assertTrue(first_started.wait(5))
+                # Only current/next signal windows were prepared before the first account day.
+                self.assertEqual(prepared, [first, second])
+                first_opened.set()
+            original_open(date=date, market=market, cache=cache)
+
+        def optimize(*, signal_date, cache):
+            self.assertEqual(get_ident(), owner)
+            if signal_date == first:
+                self.assertTrue(next_started.wait(5), "next signal was not started ahead of its account day")
+                self.assertFalse(execution_started.is_set())
+            original_optimize(signal_date=signal_date, cache=cache)
+
+        def execute(*, date, market, cache):
+            if date == execution:
+                execution_started.set()
+            yield from original_execute(date=date, market=market, cache=cache)
+
+        engine.submission_runner.inference = inference
+        try:
+            with (patch.object(engine.data_provider, "as_of", prepare),
+                  patch.object(engine.accounting, "mark_at_open", open_mark),
+                  patch.object(engine.optimizer, "optimize", optimize),
+                  patch.object(engine.broker, "execute", execute)):
+                engine.run()
+        finally:
+            first_opened.set()
+            execution_started.set()
+        self.assertEqual(self.calls, [first, second])
+        self.assertEqual(len(set(model_threads)), 1)
+        self.assertTrue(model_threads[0].startswith("skd-infer"))
+        self.assertFalse(any(t.name.startswith(("skd-infer", "skd-data")) for t in threads()))
+
+    def test_failed_inference_stops_queued_model_calls_and_can_restart(self):
+        calls = []
+
+        def fail(*, as_of_date, data):
+            calls.append(as_of_date)
+            raise RuntimeError("first prediction failed")
+
+        engine = self.make_engine(inference=fail, rebalance_interval=1)
+        with self.assertRaisesRegex(RuntimeError, "first prediction failed"):
+            engine.run()
+        self.assertEqual(calls, [self.dates[0]])
+        self.assertIsNone(engine.metrics)
+        self.assertFalse(any(t.name.startswith(("skd-infer", "skd-data")) for t in threads()))
+        engine.submission_runner.inference = self.inference
+        engine.run()
+        self.assertEqual(engine.trading_dates, self.dates)
+
+    def test_future_inference_error_is_reported_at_its_signal_date(self):
+        first, execution, second = self.dates[:3]
+
+        def inference(*, as_of_date, data):
+            if as_of_date == second:
+                raise RuntimeError("future prediction failed")
+            return self.inference(as_of_date=as_of_date, data=data)
+
+        engine = self.make_engine(inference=inference, output_dir=self.root / "future-failed")
+        with protocol_components(engine) as trace, self.assertRaisesRegex(RuntimeError, "future prediction failed"):
+            engine.run()
+        self.assertIn(("execute", execution), trace)
+        self.assertNotIn(("optimize", second), trace)
+        records = [json.loads(line) for line in (engine.config.output_dir / "run.log").read_text(encoding="utf-8").splitlines()]
+        error = next(record for record in records if record["level"] == "ERROR")
+        self.assertEqual(error["date"], second)
+        self.assertEqual(error["details"]["failed_phase"], "SIGNAL")
+        self.assertEqual(error["details"]["component"], "runner.predict")
+        self.assertIsNone(engine.metrics)
+        self.assertFalse(any(t.name.startswith(("skd-infer", "skd-data")) for t in threads()))
+
+    def test_empty_and_single_day_intervals(self):
+        for start, end, expected in (
             ("2018-01-02", "2018-01-02", ["2018-01-02"]),
             ("2017-12-30", "2018-01-01", []),
-        ]:
-            with self.subTest(start=start, end=end):
+        ):
+            with self.subTest(start=start):
                 engine = self.make_engine(start_date=start, end_date=end)
-                with (redirect_stdout(StringIO()),
-                      patch.object(engine.accounting, "mark_at_open", wraps=engine.accounting.mark_at_open) as open_mark,
-                      patch.object(engine.accounting, "mark_to_market", wraps=engine.accounting.mark_to_market) as close,
-                      patch.object(engine.broker, "execute", wraps=engine.broker.execute) as execute):
-                    engine.run()
-                self.assertEqual(engine.trading_dates, expected)
-                self.assertEqual(open_mark.call_count, len(expected))
-                self.assertEqual(close.call_count, len(expected))
-                execute.assert_not_called()
-                self.assertEqual(self.calls, [])
-                self.assertEqual(set(engine.tables), set(RESULT_COLUMNS))
-
-    def test_accounting_failure_stops_decisions_and_cleans_up_reader(self):
-        for method in ("mark_at_open", "mark_to_market"):
-            engine = self.make_engine()
-            with (self.subTest(method=method),
-                  patch.object(engine.accounting, method, side_effect=RuntimeError("valuation failed")),
-                  patch.object(engine.optimizer, "optimize") as optimize,
-                  self.assertRaisesRegex(RuntimeError, "valuation failed")):
                 engine.run()
-            optimize.assert_not_called()
-            self.assertEqual(self.calls, [])
-            self.assertIsNone(engine.metrics)
-            self.assertIsNone(engine.data_provider._executor)
-            self.assertFalse(engine.data_provider._tables)
+                self.assertEqual(engine.trading_dates, expected)
+                self.assertTrue(engine.tables["target_weights"].empty)
+                self.assertEqual(len(engine.tables["equity_curve"]), len(expected))
+                self.assertEqual(self.calls, [])
+                self.assertEqual(engine.account["cash"], engine.config.initial_cash)
 
-    def test_inference_errors_propagate(self):
-        def inference(*, as_of_date, data):
+    def test_cost_failure_closes_generator_reader_and_records_log(self):
+        output = self.root / "failed"
+        engine = self.make_engine(output_dir=output)
+        with (protocol_components(engine) as trace,
+              patch.object(engine.cost_model, "calculate", side_effect=RuntimeError("quote failed")),
+              self.assertRaisesRegex(RuntimeError, "quote failed")):
+            engine.run()
+        self.assertIn(("execution_closed", "2018-01-03"), trace)
+        self.assertNotIn(("close", "2018-01-03"), trace)
+        self.assertIsNone(engine.metrics)
+        self.assertFalse(engine.tables)
+        self.assertIsNone(engine.data_provider._executor)
+        self.assertFalse(any(thread.name.startswith(("skd-data", "skd-infer")) for thread in threads()))
+        records = [json.loads(line) for line in (output / "run.log").read_text(encoding="utf-8").splitlines()]
+        errors = [record for record in records if record["level"] == "ERROR"]
+        self.assertEqual(errors[-1]["phase"], "FAILED")
+        self.assertIn("cost_model", errors[-1]["details"]["component"])
+        self.assertEqual(errors[-1]["details"]["failed_phase"], "EXECUTION")
+        self.assertFalse((output / "metrics.json").exists())
+        self.assertIsNone(engine.result_writer._log)
+        before = (output / "run.log").read_bytes()
+        with self.assertRaises(FileExistsError):
+            engine.run()
+        self.assertEqual((output / "run.log").read_bytes(), before)
+
+    def test_calendar_errors_are_explicit(self):
+        broken = self.make_engine(end_date="2018-02-01", output_dir=self.root / "missing-month")
+        with self.assertRaises(FileNotFoundError):
+            broken.run()
+        records = [json.loads(line) for line in (broken.config.output_dir / "run.log").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(records[-1]["details"]["component"], "data_provider.prepare")
+
+    def test_cleanup_failure_does_not_publish_success(self):
+        engine = self.make_engine()
+        close = engine.result_writer.close
+
+        def failing_close(*, cache):
+            close(cache=cache)
+            raise OSError("log close failed")
+
+        with (protocol_components(engine), patch.object(engine.result_writer, "close", failing_close),
+              self.assertRaisesRegex(OSError, "log close failed")):
+            engine.run()
+        self.assertIsNone(engine.metrics)
+        self.assertEqual(engine.tables, {})
+        self.assertEqual(engine.account, {})
+        self.assertIsNone(engine.data_provider._executor)
+
+    def test_invalid_predictions_and_inference_errors_stop_pipeline(self):
+        bad = (
+            pd.DataFrame({"date": "2018-01-02", "code": ["SH600000"], "score": [1.0]}),
+            pd.DataFrame({"date": "2018-01-02", "code": ["SH600000", "SH600000"], "score": [1., 2.]}),
+            pd.DataFrame({"date": "2018-01-02", "code": ["SH600000", "SZ000001"], "score": [1., float("inf")]}),
+            pd.DataFrame({"date": "2099-01-01", "code": ["SH600000", "SZ000001"], "score": [1., 2.]}),
+        )
+        for frame in bad:
+            with self.subTest(frame=frame):
+                engine = self.make_engine(inference=lambda **kw: frame)
+                with protocol_components(engine) as trace, self.assertRaises(ValueError):
+                    engine.run()
+                self.assertFalse(any(item[0] == "optimize" for item in trace))
+                self.assertIsNone(engine.metrics)
+                self.assertIsNone(engine.data_provider._executor)
+
+        def inference(**kwargs):
             raise RuntimeError("model failed")
-
         engine = self.make_engine(inference=inference)
-        with redirect_stdout(StringIO()), self.assertRaisesRegex(RuntimeError, "model failed"):
+        with protocol_components(engine), self.assertRaisesRegex(RuntimeError, "model failed"):
             engine.run()
         self.assertIsNone(engine.metrics)
 

@@ -1,0 +1,1258 @@
+{
+  "source": "current",
+  "mode": "sample",
+  "end": "2022-12-31",
+  "prefetch": true,
+  "wall_seconds": 62.1122258999967,
+  "process_cpu_seconds": 63.8125,
+  "main_thread_cpu_seconds": 60.484375,
+  "process_cpu_over_wall": 1.027374225852746,
+  "main_thread_cpu_over_wall": 0.9737917796953919,
+  "rss_peak_mib": 736.94921875,
+  "rss_mean_mib": 589.8630160599638,
+  "io_read_bytes": 180086537,
+  "io_write_bytes": 0,
+  "performance": {
+    "elapsed_seconds": 62.11141240000143,
+    "playback_seconds": 60.969945899996674,
+    "inference_seconds": 0.8353552000480704,
+    "inference_calls": 341,
+    "trading_days": 1703,
+    "market_rows": 803524,
+    "days_per_second": 27.418471649502546,
+    "source_rows_per_second": 27231.32407789138,
+    "data": {
+      "calendar_files": 84,
+      "calendar_seconds": 0.12838100000226405,
+      "data_files": 252,
+      "data_bytes": 158772790,
+      "batches": 7,
+      "read_seconds": 6.14238579999801,
+      "wait_seconds": 0.2110261999987415,
+      "as_of_seconds": 1.717873700108612,
+      "source_rows": {
+        "Factor33_winsor": 590238,
+        "Barra_factor": 510900,
+        "MarketData": 590238
+      },
+      "delivered_rows": {
+        "Factor33_winsor": 23851800,
+        "Barra_factor": 23851800,
+        "MarketData": 23851800
+      },
+      "warmup_days": 0,
+      "seed_files": 0,
+      "seed_rows": 0,
+      "open_rows": 803524,
+      "close_rows": 803524,
+      "market_seconds": 3.3745866002936964
+    }
+  },
+  "outputs": {
+    "predictions": {
+      "rows": 102300,
+      "columns": [
+        "date",
+        "code",
+        "score",
+        "future_return"
+      ],
+      "sha256": "c7376ad254cdb8e68f07a8c40fb04093756c366552ec7968abfe79d12f533bb4"
+    },
+    "rankic": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "rankic",
+        "n_stocks"
+      ],
+      "sha256": "ece6c06e464952bb299cea027b7daac0ac31ee7f858f43e70c2dbe9eca40d114"
+    },
+    "target_weights": {
+      "rows": 0,
+      "columns": [
+        "signal_date",
+        "execution_date",
+        "code",
+        "score",
+        "benchmark_weight",
+        "target_weight"
+      ],
+      "sha256": "6794dbe7a2d9285948a5e87ff440c8ad877e2b86c5fd6889e0f995de71c04a06"
+    },
+    "orders": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "side",
+        "requested_shares",
+        "status",
+        "reject_reason",
+        "order_id",
+        "signal_date",
+        "requested_value",
+        "filled_shares",
+        "filled_value"
+      ],
+      "sha256": "397b8bf3928223d125c28493d5ef709c9c2d256e72d6cf72714ccd1a3513b503"
+    },
+    "trades": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "side",
+        "shares",
+        "price",
+        "trade_value",
+        "commission",
+        "stamp_tax",
+        "other_cost",
+        "total_cost",
+        "order_id",
+        "signal_date",
+        "position_value"
+      ],
+      "sha256": "97a6f81655619f26f1de5d393e6af571c0727117e4672501d65f3fd4f11f9dec"
+    },
+    "positions": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "shares",
+        "sellable_shares",
+        "close",
+        "market_value",
+        "weight"
+      ],
+      "sha256": "7ec7d63ef86f77b988ccadc9c62115f15eb977d1abab19059d27e7b74f81303f"
+    },
+    "equity_curve": {
+      "rows": 1703,
+      "columns": [
+        "date",
+        "cash",
+        "market_value",
+        "portfolio_value",
+        "portfolio_nav",
+        "portfolio_return",
+        "benchmark_nav",
+        "benchmark_return",
+        "active_return",
+        "turnover",
+        "transaction_cost"
+      ],
+      "sha256": "e16c8d012a6751d705251c53dcea405c42208324d769f3f522112bf2b9e697aa"
+    }
+  },
+  "metrics": {
+    "mean_rankic": null,
+    "rankic_std": null,
+    "rankic_ir": null,
+    "positive_rankic_ratio": null,
+    "total_return": null,
+    "annualized_return": null,
+    "annualized_excess_return": null,
+    "annualized_volatility": null,
+    "maximum_drawdown": null,
+    "tracking_error": null,
+    "information_ratio": null,
+    "sharpe_ratio": null,
+    "turnover": null,
+    "transaction_cost": null,
+    "failed_orders": null
+  },
+  "inventory": {},
+  "clone_schemas": {},
+  "environment": {
+    "python": "3.13.13",
+    "pandas": "3.0.6",
+    "pyarrow": "25.0.1",
+    "psutil": "7.2.2",
+    "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "logical_cpus": 32,
+    "platform": "Windows-11-10.0.26200-SP0"
+  },
+  "head": "94e22c7aa4100955e1606c2cec632a7fd41a9ca9",
+  "source_sha256": {
+    "__init__.py": "1cd17c99f9103369d6deda77677981d04344dab16dc814b1a1f03d7f5c59afa0",
+    "accounting.py": "f2bb6347163ee7f65134f364f1823455e6470553e8768a578a5771f4234db46b",
+    "broker.py": "655236e9faed65df0c37fd2508e36ce0ba1af6adbe27b631cedca63ea6b1a306",
+    "config.py": "d35374705b03aa2fa10323dbd58020ffe23c5540e8ed92e35a12421796a6bf2f",
+    "contracts.py": "173932af34fa2e9a022b2c10ead1b7b6212245dd33c74c62b32fe197f7463244",
+    "corporate_actions.py": "9392c87ad16b9084ec29b56f6c3dd3bd42e7ab983eed22feca0dc19b8792f60d",
+    "cost_model.py": "86ec63e5592bc4db4675f0c8dc99c2dbd91af23c93b667958f82fc0d00f82a6b",
+    "data_provider.py": "6589b4f5b55cb004f69a99886edcb59a341bf98a8b6049da3539ebc5f49c6743",
+    "engine.py": "958d77d36aa6cdcddba012cad9a6c59a4d649e49127420cb8cb237bcb3f31346",
+    "label_provider.py": "f88420970d44ec03c32a73d2d689200617d6e141d2cb2740080c1a2ac8b139c5",
+    "metrics.py": "3c4138d9bb9ab292583ea9cc01820f991f7f7a0e0239ffe6d4fd13f00fca378b",
+    "portfolio_optimizer.py": "bc8d20a12a4149ccb90451c0bdd8fdb4d25711e96d1f93d4caf8df0d565ea3a4",
+    "prediction_evaluator.py": "ab24d9575d2c8f942f1e7707bf10208e935e8b8803e36a42e07281d5f26e31e7",
+    "reference_data.py": "7547609ad2080a7663d7853a73c49e3643c5c6f169fc41e600900bdf0d00a215",
+    "result_writer.py": "7ce8ecc1a1308493744611d7db4ec28cfa816de6127f2fb6012ce8a7c084c7c6",
+    "runtime_cache.py": "93c18dd896e5e435bd71d21389001eaf52d0799f2260eb040e71fcbc84cee919",
+    "schemas.py": "c18b79e331f1ac28df9a00331ce4ee2e49a900e8326420139c8e0bc5c2023218",
+    "submission_runner.py": "40c4e4ad7d61afadbab459d4940e25da9ac8ee65588236b36e5f3b116da66d47"
+  },
+  "sampling": {
+    "samples": 3544,
+    "mean_gap_seconds": 0.017524910750564178,
+    "max_gap_seconds": 0.6411959000033676,
+    "by_leaf": [
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\string_arrow.py",
+        "line": 195,
+        "function": "_from_sequence",
+        "samples": 1225,
+        "fraction": 0.3456546275395034
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 366,
+        "function": "__init__",
+        "samples": 674,
+        "fraction": 0.1901805869074492
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2487,
+        "function": "_merge_blocks",
+        "samples": 500,
+        "fraction": 0.14108352144469527
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pyarrow\\compute.py",
+        "line": 467,
+        "function": "take",
+        "samples": 344,
+        "fraction": 0.09706546275395034
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1757,
+        "function": "to_numpy",
+        "samples": 270,
+        "fraction": 0.07618510158013544
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 639,
+        "function": "copy",
+        "samples": 82,
+        "fraction": 0.023137697516930022
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1533,
+        "function": "factorize",
+        "samples": 57,
+        "fraction": 0.01608352144469526
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1172,
+        "function": "equals",
+        "samples": 56,
+        "fraction": 0.01580135440180587
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pyarrow\\compute.py",
+        "line": 256,
+        "function": "wrapper",
+        "samples": 47,
+        "fraction": 0.013261851015801355
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1430,
+        "function": "_iset_split_block",
+        "samples": 41,
+        "fraction": 0.011568848758465011
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\numpy\\_core\\fromnumeric.py",
+        "line": 48,
+        "function": "_wrapfunc",
+        "samples": 33,
+        "fraction": 0.009311512415349887
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pyarrow\\compute.py",
+        "line": 348,
+        "function": "cast",
+        "samples": 26,
+        "fraction": 0.007336343115124154
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 3656,
+        "function": "get_indexer",
+        "samples": 25,
+        "fraction": 0.007054176072234763
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\numpy\\_core\\shape_base.py",
+        "line": 218,
+        "function": "vstack",
+        "samples": 22,
+        "fraction": 0.006207674943566591
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\threading.py",
+        "line": 327,
+        "function": "wait",
+        "samples": 13,
+        "fraction": 0.003668171557562077
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\array_algos\\take.py",
+        "line": 118,
+        "function": "_take_nd_ndarray",
+        "samples": 13,
+        "fraction": 0.003668171557562077
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\computation\\expressions.py",
+        "line": 77,
+        "function": "_evaluate_standard",
+        "samples": 12,
+        "fraction": 0.003386004514672686
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1226,
+        "function": "iget",
+        "samples": 10,
+        "fraction": 0.0028216704288939053
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\common.py",
+        "line": 1796,
+        "function": "validate_all_hashable",
+        "samples": 6,
+        "fraction": 0.001693002257336343
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\concat.py",
+        "line": 61,
+        "function": "concatenate_managers",
+        "samples": 6,
+        "fraction": 0.001693002257336343
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\algorithms.py",
+        "line": 1229,
+        "function": "searchsorted",
+        "samples": 6,
+        "fraction": 0.001693002257336343
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pyarrow\\compute.py",
+        "line": 246,
+        "function": "wrapper",
+        "samples": 4,
+        "fraction": 0.001128668171557562
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 778,
+        "function": "__getitem__",
+        "samples": 4,
+        "fraction": 0.001128668171557562
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2027,
+        "function": "__init__",
+        "samples": 4,
+        "fraction": 0.001128668171557562
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pyarrow\\parquet\\core.py",
+        "line": 1525,
+        "function": "read",
+        "samples": 3,
+        "fraction": 0.0008465011286681715
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 586,
+        "function": "_box_pa_scalar",
+        "samples": 3,
+        "fraction": 0.0008465011286681715
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1902,
+        "function": "_concat_same_type",
+        "samples": 3,
+        "fraction": 0.0008465011286681715
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 609,
+        "function": "_info_axis",
+        "samples": 3,
+        "fraction": 0.0008465011286681715
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 399,
+        "function": "apply",
+        "samples": 3,
+        "fraction": 0.0008465011286681715
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pyarrow\\pandas_compat.py",
+        "line": 799,
+        "function": "table_to_dataframe",
+        "samples": 2,
+        "fraction": 0.000564334085778781
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 900,
+        "function": "_slice_take_blocks_ax0",
+        "samples": 2,
+        "fraction": 0.000564334085778781
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 3798,
+        "function": "_get_indexer",
+        "samples": 2,
+        "fraction": 0.000564334085778781
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4337,
+        "function": "__getitem__",
+        "samples": 2,
+        "fraction": 0.000564334085778781
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\range.py",
+        "line": 630,
+        "function": "_view",
+        "samples": 2,
+        "fraction": 0.000564334085778781
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\base.py",
+        "line": 931,
+        "function": "__iter__",
+        "samples": 2,
+        "fraction": 0.000564334085778781
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\masked.py",
+        "line": 1119,
+        "function": "copy",
+        "samples": 2,
+        "fraction": 0.000564334085778781
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 230,
+        "function": "close",
+        "samples": 2,
+        "fraction": 0.000564334085778781
+      },
+      {
+        "file": "<frozen importlib._bootstrap_external>",
+        "line": 145,
+        "function": "_path_stat",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\algorithms.py",
+        "line": 967,
+        "function": "duplicated",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\io\\parquet.py",
+        "line": 86,
+        "function": "_get_path_or_handle",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1221,
+        "function": "_getbool_axis",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\array_algos\\take.py",
+        "line": 464,
+        "function": "_take_nd_object",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 239,
+        "function": "blklocs",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\range.py",
+        "line": 240,
+        "function": "_simple_new",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4968,
+        "function": "_get_item",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6179,
+        "function": "__getattr__",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 5384,
+        "function": "__getitem__",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\numpy\\_core\\_methods.py",
+        "line": 55,
+        "function": "_any",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\cast.py",
+        "line": 1268,
+        "function": "np_find_common_type",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\copy.py",
+        "line": 119,
+        "function": "deepcopy",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 332,
+        "function": "_validate",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 686,
+        "function": "_constructor_sliced_from_mgr",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pyarrow\\types.py",
+        "line": 272,
+        "function": "is_timestamp",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1625,
+        "function": "take",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\common.py",
+        "line": 1659,
+        "function": "_is_dtype_type",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2204,
+        "function": "internal_values",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\series.py",
+        "line": 789,
+        "function": "_values",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 1033,
+        "function": "view",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 5334,
+        "function": "__contains__",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexers\\utils.py",
+        "line": 441,
+        "function": "check_array_indexer",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2130,
+        "function": "_block",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 3601,
+        "function": "get_loc",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\common.py",
+        "line": 142,
+        "function": "is_object_dtype",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\common.py",
+        "line": 652,
+        "function": "condition",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\common.py",
+        "line": 610,
+        "function": "is_string_dtype",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\string_arrow.py",
+        "line": 307,
+        "function": "isin",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\numpy\\_core\\numeric.py",
+        "line": 323,
+        "function": "full",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\concat.py",
+        "line": 478,
+        "function": "<genexpr>",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\concat.py",
+        "line": 251,
+        "function": "_get_combined_plan",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\concat.py",
+        "line": 468,
+        "function": "<genexpr>",
+        "samples": 1,
+        "fraction": 0.0002821670428893905
+      }
+    ],
+    "by_inclusive": [
+      {
+        "file": "D:\\skd-backtest\\benchmarks\\runtime_cache_profile\\profile_run.py",
+        "line": 1,
+        "function": "<module>",
+        "samples": 3544,
+        "fraction": 1.0
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\engine.py",
+        "line": 78,
+        "function": "run",
+        "samples": 3544,
+        "fraction": 1.0
+      },
+      {
+        "file": "D:\\skd-backtest\\benchmarks\\runtime_cache_profile\\profile_run.py",
+        "line": 71,
+        "function": "main",
+        "samples": 3544,
+        "fraction": 1.0
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\engine.py",
+        "line": 89,
+        "function": "call",
+        "samples": 2581,
+        "fraction": 0.7282731376975169
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 492,
+        "function": "publish",
+        "samples": 2191,
+        "fraction": 0.6182279909706546
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 271,
+        "function": "_publish",
+        "samples": 2191,
+        "fraction": 0.6182279909706546
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\construction.py",
+        "line": 531,
+        "function": "sanitize_array",
+        "samples": 1904,
+        "fraction": 0.5372460496613995
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\string_arrow.py",
+        "line": 195,
+        "function": "_from_sequence",
+        "samples": 1899,
+        "fraction": 0.5358352144469526
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 486,
+        "function": "__new__",
+        "samples": 1869,
+        "fraction": 0.5273702031602708
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 7919,
+        "function": "ensure_index",
+        "samples": 1852,
+        "fraction": 0.5225733634311512
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 6288,
+        "function": "_get_indexer_strict",
+        "samples": 1808,
+        "fraction": 0.510158013544018
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 332,
+        "function": "_validate",
+        "samples": 1480,
+        "fraction": 0.417607223476298
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 100,
+        "function": "_frame",
+        "samples": 1432,
+        "fraction": 0.4040632054176072
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 3656,
+        "function": "get_indexer",
+        "samples": 1422,
+        "fraction": 0.40124153498871334
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 6252,
+        "function": "get_indexer_for",
+        "samples": 1405,
+        "fraction": 0.3964446952595937
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4337,
+        "function": "__getitem__",
+        "samples": 1341,
+        "fraction": 0.3783860045146727
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 6829,
+        "function": "_maybe_cast_listlike_indexer",
+        "samples": 1159,
+        "fraction": 0.3270316027088036
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 317,
+        "function": "_account",
+        "samples": 1017,
+        "fraction": 0.28696388261851014
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\broker.py",
+        "line": 16,
+        "function": "start_day",
+        "samples": 926,
+        "fraction": 0.2612866817155756
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\accounting.py",
+        "line": 22,
+        "function": "mark_to_market",
+        "samples": 710,
+        "fraction": 0.20033860045146726
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 366,
+        "function": "__init__",
+        "samples": 674,
+        "fraction": 0.1901805869074492
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\string_arrow.py",
+        "line": 134,
+        "function": "__init__",
+        "samples": 674,
+        "fraction": 0.1901805869074492
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 739,
+        "function": "copy",
+        "samples": 642,
+        "fraction": 0.1811512415349887
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6548,
+        "function": "copy",
+        "samples": 642,
+        "fraction": 0.1811512415349887
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\corporate_actions.py",
+        "line": 15,
+        "function": "apply",
+        "samples": 622,
+        "fraction": 0.1755079006772009
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1192,
+        "function": "__getitem__",
+        "samples": 574,
+        "fraction": 0.16196388261851016
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1058,
+        "function": "_getitem_lowerdim",
+        "samples": 562,
+        "fraction": 0.15857787810383747
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1383,
+        "function": "_getitem_tuple",
+        "samples": 562,
+        "fraction": 0.15857787810383747
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 83,
+        "function": "_clone",
+        "samples": 562,
+        "fraction": 0.15857787810383747
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1415,
+        "function": "_getitem_axis",
+        "samples": 561,
+        "fraction": 0.15829571106094809
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1352,
+        "function": "_getitem_iterable",
+        "samples": 559,
+        "fraction": 0.1577313769751693
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 702,
+        "function": "__init__",
+        "samples": 559,
+        "fraction": 0.1577313769751693
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1975,
+        "function": "_consolidate_inplace",
+        "samples": 555,
+        "fraction": 0.15660270880361174
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2470,
+        "function": "_consolidate",
+        "samples": 555,
+        "fraction": 0.15660270880361174
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2487,
+        "function": "_merge_blocks",
+        "samples": 555,
+        "fraction": 0.15660270880361174
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1550,
+        "function": "_get_listlike_indexer",
+        "samples": 548,
+        "fraction": 0.154627539503386
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\broker.py",
+        "line": 21,
+        "function": "execute",
+        "samples": 510,
+        "fraction": 0.14390519187358916
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\construction.py",
+        "line": 375,
+        "function": "dict_to_mgr",
+        "samples": 509,
+        "fraction": 0.14362302483069977
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 308,
+        "function": "playback",
+        "samples": 375,
+        "fraction": 0.10581264108352144
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1625,
+        "function": "take",
+        "samples": 346,
+        "fraction": 0.09762979683972912
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pyarrow\\compute.py",
+        "line": 467,
+        "function": "take",
+        "samples": 344,
+        "fraction": 0.09706546275395034
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 1228,
+        "function": "take",
+        "samples": 322,
+        "fraction": 0.09085778781038374
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 487,
+        "function": "read",
+        "samples": 298,
+        "fraction": 0.08408577878103837
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1757,
+        "function": "to_numpy",
+        "samples": 270,
+        "fraction": 0.07618510158013544
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 907,
+        "function": "__array__",
+        "samples": 269,
+        "fraction": 0.07590293453724604
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\base.py",
+        "line": 804,
+        "function": "astype",
+        "samples": 269,
+        "fraction": 0.07590293453724604
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\string_arrow.py",
+        "line": 325,
+        "function": "astype",
+        "samples": 269,
+        "fraction": 0.07590293453724604
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 5127,
+        "function": "_get_engine_target",
+        "samples": 269,
+        "fraction": 0.07590293453724604
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\schemas.py",
+        "line": 49,
+        "function": "empty_result",
+        "samples": 266,
+        "fraction": 0.07505643340857787
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 254,
+        "function": "_slice",
+        "samples": 244,
+        "fraction": 0.06884875846501129
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 3798,
+        "function": "_get_indexer",
+        "samples": 197,
+        "fraction": 0.05558690744920993
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 4147,
+        "function": "reindex",
+        "samples": 189,
+        "fraction": 0.053329571106094806
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 281,
+        "function": "open_market",
+        "samples": 159,
+        "fraction": 0.04486455981941309
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\accounting.py",
+        "line": 15,
+        "function": "mark_at_open",
+        "samples": 156,
+        "fraction": 0.04401805869074492
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 294,
+        "function": "close_market",
+        "samples": 108,
+        "fraction": 0.030474040632054177
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 264,
+        "function": "as_of",
+        "samples": 108,
+        "fraction": 0.030474040632054177
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 399,
+        "function": "apply",
+        "samples": 87,
+        "fraction": 0.024548532731376974
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4559,
+        "function": "__setitem__",
+        "samples": 85,
+        "fraction": 0.023984198645598195
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4864,
+        "function": "_set_item",
+        "samples": 85,
+        "fraction": 0.023984198645598195
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 639,
+        "function": "copy",
+        "samples": 84,
+        "fraction": 0.023702031602708805
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\portfolio_optimizer.py",
+        "line": 13,
+        "function": "optimize",
+        "samples": 78,
+        "fraction": 0.02200902934537246
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 989,
+        "function": "_rename",
+        "samples": 77,
+        "fraction": 0.02172686230248307
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 6354,
+        "function": "rename",
+        "samples": 77,
+        "fraction": 0.02172686230248307
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 849,
+        "function": "_engine",
+        "samples": 74,
+        "fraction": 0.0208803611738149
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 2457,
+        "function": "is_unique",
+        "samples": 70,
+        "fraction": 0.019751693002257337
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\submission_runner.py",
+        "line": 20,
+        "function": "predict",
+        "samples": 59,
+        "fraction": 0.01664785553047404
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1533,
+        "function": "factorize",
+        "samples": 57,
+        "fraction": 0.01608352144469526
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 5584,
+        "function": "equals",
+        "samples": 56,
+        "fraction": 0.01580135440180587
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1172,
+        "function": "equals",
+        "samples": 56,
+        "fraction": 0.01580135440180587
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 7965,
+        "function": "duplicated",
+        "samples": 54,
+        "fraction": 0.015237020316027089
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1065,
+        "function": "take",
+        "samples": 51,
+        "fraction": 0.014390519187358916
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 3998,
+        "function": "take",
+        "samples": 51,
+        "fraction": 0.014390519187358916
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4848,
+        "function": "_set_item_mgr",
+        "samples": 50,
+        "fraction": 0.014108352144469526
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pyarrow\\compute.py",
+        "line": 256,
+        "function": "wrapper",
+        "samples": 47,
+        "fraction": 0.013261851015801355
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\series.py",
+        "line": 6726,
+        "function": "_cmp_method",
+        "samples": 46,
+        "fraction": 0.012979683972911963
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arraylike.py",
+        "line": 40,
+        "function": "__eq__",
+        "samples": 46,
+        "fraction": 0.012979683972911963
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\ops\\common.py",
+        "line": 67,
+        "function": "new_method",
+        "samples": 46,
+        "fraction": 0.012979683972911963
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\ops\\array_ops.py",
+        "line": 294,
+        "function": "comparison_op",
+        "samples": 46,
+        "fraction": 0.012979683972911963
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\base.py",
+        "line": 1626,
+        "function": "_duplicated",
+        "samples": 45,
+        "fraction": 0.012697516930022574
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 5384,
+        "function": "__getitem__",
+        "samples": 45,
+        "fraction": 0.012697516930022574
+      }
+    ]
+  }
+}

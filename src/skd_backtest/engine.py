@@ -1,6 +1,4 @@
-"""Daily backtest control flow with placeholder financial modules."""
-
-import logging
+"""Market-flow orchestration; all non-market handoffs use the runtime protocol."""
 
 from contextlib import closing
 from pathlib import Path
@@ -11,29 +9,24 @@ import pandas as pd
 
 from .accounting import PortfolioAccounting
 from .broker import Broker
-from .config import BacktestConfig, CostConfig, OptimizerConfig
+from .config import BacktestConfig, CostConfig, DataCapabilities, OptimizerConfig, ReferenceSources
+from .contracts import ComponentRole as Role, MarketContext, Phase, RunCalendar, RunContext, Topic
 from .corporate_actions import CorporateActionEngine
 from .cost_model import CostModel
 from .data_provider import DataProvider
+from .inference_pipeline import inference_days
+from .label_provider import LabelProvider
 from .metrics import Metrics
 from .portfolio_optimizer import PortfolioOptimizer
 from .prediction_evaluator import PredictionEvaluator
+from .reference_data import ReferenceDataProvider
 from .result_writer import ResultWriter
-from .schemas import RESULT_COLUMNS, empty_result
+from .runtime_cache import RuntimeCache
 from .submission_runner import Inference, SubmissionRunner
 
 
-logger = logging.getLogger(__name__)
-
-
 class BacktestEngine:
-    """Configure once, call run(), read the returned metrics or engine.metrics.
-
-    inference is a callable accepting keyword arguments as_of_date and data.
-    Pass model.predict when using the specification's InferenceModel object.
-    Dates use YYYY-MM-DD; interval, horizon and lookback use trading days.
-    Playback bounds are validated; data and inference errors propagate to the caller.
-    """
+    """Run the cache-backed skeleton; financial components currently publish placeholders."""
 
     def __init__(
         self, *, data_dir: str | Path, start_date: str, end_date: str,
@@ -44,7 +37,12 @@ class BacktestEngine:
         cost_config: CostConfig | None = None,
         trading_days_per_year: int = 252, risk_free_rate: float = 0.0,
         output_dir: str | Path | None = None,
-        read_batch_months: int = 12, prefetch: bool = True,
+        read_batch_months: int = 12, prefetch: bool = True, async_inference: bool = True,
+        benchmark_mode: Literal["none", "csi300"] = "none",
+        label_price_basis: Literal["adjusted_open", "raw_open"] = "adjusted_open",
+        rights_policy: Literal["skip", "subscribe_available_cash"] = "skip",
+        data_capabilities: DataCapabilities | None = None,
+        reference_sources: ReferenceSources | None = None,
     ):
         self.config = BacktestConfig(
             data_dir=Path(data_dir), start_date=start_date, end_date=end_date,
@@ -52,102 +50,172 @@ class BacktestEngine:
             holding_period=holding_period, lookback=lookback, price_mode=price_mode,
             trading_days_per_year=trading_days_per_year, risk_free_rate=risk_free_rate,
             output_dir=Path(output_dir) if output_dir is not None else None,
-            read_batch_months=read_batch_months, prefetch=prefetch,
+            read_batch_months=read_batch_months, prefetch=prefetch, async_inference=async_inference,
+            benchmark_mode=benchmark_mode, label_price_basis=label_price_basis,
+            rights_policy=rights_policy, data_capabilities=data_capabilities or DataCapabilities(),
+            reference_sources=reference_sources or ReferenceSources(),
         )
+        self.optimizer_config = optimizer_config or OptimizerConfig()
+        self.cost_config = cost_config or CostConfig()
+        # Components retain only immutable configuration; runtime state belongs to the cache.
         self.submission_runner = SubmissionRunner(inference)
         self.data_provider = DataProvider(self.config)
+        self.reference_data = ReferenceDataProvider(self.config)
+        self.label_provider = LabelProvider(self.config)
         self.prediction_evaluator = PredictionEvaluator()
-        self.optimizer = PortfolioOptimizer(optimizer_config or OptimizerConfig())
-        self.broker = Broker()
-        self.corporate_actions = CorporateActionEngine()
-        self.cost_model = CostModel(cost_config or CostConfig())
-        self.accounting = PortfolioAccounting()
+        self.optimizer = PortfolioOptimizer(self.optimizer_config)
+        self.broker = Broker(self.config)
+        self.corporate_actions = CorporateActionEngine(self.config)
+        self.cost_model = CostModel(self.cost_config)
+        self.accounting = PortfolioAccounting(self.config)
         self.metrics_calculator = Metrics(trading_days_per_year, risk_free_rate)
         self.result_writer = ResultWriter(self.config.output_dir)
-        self.metrics: dict[str, float | int | None] | None = None
-        self.tables: dict[str, pd.DataFrame] = {}
-        self.account: dict = {}
-        self.trading_dates: list[str] = []
-        self.performance: dict = {}
-
-    def run(self) -> dict[str, float | int | None]:
-        """Visit every trading day; financial calculations remain placeholders."""
-        logger.debug("[BacktestEngine.run] daily loop; financial modules are STUBs")
-        started = perf_counter()
-        self.performance = {}
-        inference_seconds, inference_calls, market_rows = 0.0, 0, 0
         self.metrics = None
         self.tables = {}
+        self.account = {}
         self.trading_dates = []
-        self.account = self.broker.initialize(self.config.initial_cash)
-        records = {name: [] for name in RESULT_COLUMNS}
-        pending_targets = None
-        playback_started = perf_counter()
-        with closing(self.data_provider.playback()) as days:
-            for day in days:
-                date = day.date
-                self.trading_dates.append(date)
-                logger.debug("[BacktestEngine.day] %s", date)
-                self.corporate_actions.apply(
-                    date=date, actions=self.data_provider.corporate_actions(date),
-                    account=self.account, price_mode=self.config.price_mode,
-                )
-                market = day.open_market
-                market_rows += len(market)
-                self.broker.start_day(date=date, account=self.account)
-                self.accounting.mark_at_open(
-                    date=date, account=self.account, market=market, price_mode=self.config.price_mode,
-                )
-                # None 表示无待执行调仓；空目标表仍然是一次已排期的优化结果。
-                if pending_targets is not None:
-                    orders, trades = self.broker.execute(
-                        date=date, target_weights=pending_targets, market=market,
-                        account=self.account, cost_model=self.cost_model, price_mode=self.config.price_mode,
-                    )
-                    records["orders"].append(orders)
-                    records["trades"].append(trades)
-                    pending_targets = None
+        self.performance = {}
 
-                # 每日收盘先更新实际账户，优化器随后读取当期权重，包括非调仓日及末日。
-                positions, equity = self.accounting.mark_to_market(
-                    date=date, account=self.account, market=day.close_market, price_mode=self.config.price_mode,
-                )
-                records["positions"].append(positions)
-                records["equity_curve"].append(equity)
-                if day.research is not None:
-                    inference_started = perf_counter()
-                    scores = self.submission_runner.predict(date, day.research)
-                    inference_seconds += perf_counter() - inference_started
-                    inference_calls += 1
-                    records["predictions"].append(scores)
-                    pending_targets = self.optimizer.optimize(
-                        scores=scores, **day.portfolio,
-                        current_weights=self.accounting.current_weights(self.account),
-                    ).assign(signal_date=date, execution_date=day.execution_date)
-                    records["target_weights"].append(pending_targets)
+    def run(self) -> dict[str, float | int | None]:
+        self.metrics, self.tables, self.account = None, {}, {}
+        self.trading_dates, self.performance = [], {}
+        started = perf_counter()
+        cache = RuntimeCache(context=RunContext(self.config, self.optimizer_config, self.cost_config))
+        views = {role: cache.for_component(role) for role in Role}
+        control = views[Role.ENGINE]
+        active_component = "engine"
+        failed = False
+        inference_seconds, inference_wait_seconds = 0.0, 0.0
+        inference_calls, market_rows = 0, 0
 
-        playback_seconds = perf_counter() - playback_started
-        # 循环结束后统一拼接，避免逐日复制不断增长的审计表。
-        self.tables = {
-            name: pd.concat(parts, ignore_index=True) if parts else empty_result(name)
-            for name, parts in records.items()
-        }
+        def call(role, method, **kwargs):
+            nonlocal active_component
+            active_component = f"{role}.{getattr(method, '__name__', type(method).__name__)}"
+            control.log(level="DEBUG", message=active_component)
+            return method(cache=views[role], **kwargs)
 
-        # 标签只在事后评估阶段读取，与模型/优化器的输入隔离。
-        self.tables["predictions"], self.tables["rankic"] = self.prediction_evaluator.evaluate(
-            scores=self.tables["predictions"],
-            future_returns=self.data_provider.future_returns(self.config.holding_period),
-        )
-        self.metrics = self.metrics_calculator.calculate(self.tables)
-        self.result_writer.write(metrics=self.metrics, tables=self.tables)
+        try:
+            call(Role.WRITER, self.result_writer.open)
+            self.config.validate_capabilities(self.optimizer_config)
+            active_component = "data_provider.prepare"
+            dates = self.data_provider.prepare()
+            calendar = RunCalendar.from_dates(dates, self.config.rebalance_interval)
+            control.publish(Topic.RUN_CALENDAR, None, calendar)
+            playback_started = perf_counter()
+            with closing(inference_days(
+                self.data_provider.playback(), self.submission_runner,
+                rebalance_interval=self.config.rebalance_interval, enabled=self.config.async_inference,
+            )) as days:
+                for day, prediction in days:
+                    date = day.date
+                    self.trading_dates.append(date)
+                    market_rows += len(day.open_market)
+                    cache.advance(date=date, phase=Phase.PRE_OPEN)
+                    call(Role.REFERENCE_DATA, self.reference_data.prepare_open, date=date)
+                    call(Role.CORPORATE_ACTIONS, self.corporate_actions.apply, date=date)
+                    call(Role.BROKER, self.broker.start_day, date=date)
+                    cache.advance(date=date, phase=Phase.OPEN_VALUE)
+                    call(Role.ACCOUNTING, self.accounting.mark_at_open, date=date, market=day.open_market)
+                    cache.advance(date=date, phase=Phase.EXECUTION)
+                    with closing(call(Role.BROKER, self.broker.execute, date=date, market=day.open_market)) as execution:
+                        while True:
+                            active_component = "broker.execute"
+                            try:
+                                request_id = next(execution)
+                            except StopIteration:
+                                break
+                            if type(request_id) is not int or not control.contains(Topic.COST_REQUEST, (date, request_id)):
+                                raise RuntimeError("Broker must publish the cost request before yielding its ID")
+                            call(Role.COST_MODEL, self.cost_model.calculate, date=date, request_id=request_id)
+                            if not control.contains(Topic.COST_RESULT, (date, request_id)):
+                                raise RuntimeError("Cost Model did not publish a quote")
+                    cache.advance(date=date, phase=Phase.CLOSE_VALUE)
+                    call(Role.REFERENCE_DATA, self.reference_data.prepare_close, date=date)
+                    call(Role.ACCOUNTING, self.accounting.mark_to_market, date=date, market=day.close_market)
+                    if day.portfolio is not None:
+                        cache.advance(date=date, phase=Phase.SIGNAL)
+                        barra = day.portfolio["barra_exposures"].rename(columns={"日期": "date", "代码": "code"})
+                        barra["date"] = pd.to_datetime(barra["date"], format="%Y%m%d").dt.strftime("%Y-%m-%d")
+                        control.publish(Topic.MARKET_CONTEXT, date, MarketContext(date, barra[["code"]], barra))
+                        call(Role.REFERENCE_DATA, self.reference_data.prepare_signal, date=date)
+                        if prediction is None:
+                            inference_started = perf_counter()
+                            call(Role.RUNNER, self.submission_runner.predict, as_of_date=date, data=day.research)
+                            inference_seconds += perf_counter() - inference_started
+                        else:
+                            active_component = "runner.predict"
+                            wait_started = perf_counter()
+                            scores, duration = prediction.result()
+                            inference_wait_seconds += perf_counter() - wait_started
+                            inference_seconds += duration
+                            call(Role.RUNNER, self.submission_runner.publish_scores,
+                                 as_of_date=date, scores=scores)
+                        inference_calls += 1
+                        call(Role.OPTIMIZER, self.optimizer.optimize, signal_date=date)
+                    call(Role.WRITER, self.result_writer.flush_log)
+                    cache.finish_day(date=date)
+                    active_component = "data_provider.playback"
+            playback_seconds = perf_counter() - playback_started
+            cache.advance(date=None, phase=Phase.EVALUATION)
+            call(Role.LABEL_PROVIDER, self.label_provider.build)
+            call(Role.EVALUATOR, self.prediction_evaluator.evaluate)
+            cache.advance(date=None, phase=Phase.METRICS)
+            call(Role.METRICS, self.metrics_calculator.calculate)
+            cache.advance(date=None, phase=Phase.OUTPUT)
+            call(Role.WRITER, self.result_writer.write)
+            control.read(Topic.OUTPUT_RECEIPT)  # Require a completed output/disabled receipt.
+            metrics = control.read(Topic.EVALUATION_METRICS)
+            tables = control.result_tables()
+            if dates:
+                closing_snapshot = control.read(Topic.ACCOUNT_CLOSE, dates[-1])
+                state = closing_snapshot.account
+                equity = closing_snapshot.equity_curve.iloc[0]
+                market_value, portfolio_value = equity["market_value"], equity["portfolio_value"]
+            else:
+                initial = control.read(Topic.ACCOUNT_INITIAL)
+                state, market_value, portfolio_value = initial.account, 0.0, initial.portfolio_value
+            positions = state.positions.set_index("code")
+            account = {
+                "price_mode": state.price_mode, "cash": state.cash,
+                "total_shares": positions.total_shares.to_dict() if state.price_mode == "raw_price" else {},
+                "sellable_shares": positions.sellable_shares.to_dict() if state.price_mode == "raw_price" else {},
+                "market_value": market_value, "portfolio_value": portfolio_value,
+            }
+            if state.price_mode == "adjusted_return":
+                account["position_values"] = positions.position_value.to_dict()
+        except BaseException as exc:
+            failed = True
+            failed_phase = cache.phase
+            cache.advance(date=cache.date, phase=Phase.FAILED)
+            control.log(level="ERROR", message=str(exc),
+                        details={"component": active_component, "exception": type(exc).__name__, "failed_phase": failed_phase})
+            raise
+        finally:
+            cleanup_error = None
+            # Keep the log open while releasing the reader, so cleanup failures are recorded.
+            for component, cleanup in (("data_provider", self.data_provider.close),
+                                       ("writer", lambda: self.result_writer.close(cache=views[Role.WRITER]))):
+                try:
+                    cleanup()
+                    if component == "data_provider" and not failed:
+                        control.log(level="INFO", message="run completed")
+                except Exception as exc:
+                    cleanup_error = cleanup_error or exc
+                    cache.advance(date=cache.date, phase=Phase.FAILED)
+                    control.log(level="ERROR", message=str(exc), details={"component": component + ".close"})
+            cache.close()
+            if cleanup_error is not None and not failed:
+                raise cleanup_error
+        # Publish public success state only after resources have closed successfully.
+        self.metrics, self.tables, self.account = metrics, tables, account
         elapsed = perf_counter() - started
         self.performance = {
             "elapsed_seconds": elapsed, "playback_seconds": playback_seconds,
-            "inference_seconds": inference_seconds, "inference_calls": inference_calls,
+            "inference_seconds": inference_seconds, "inference_wait_seconds": inference_wait_seconds,
+            "inference_calls": inference_calls,
             "trading_days": len(self.trading_dates), "market_rows": market_rows,
             "days_per_second": len(self.trading_dates) / elapsed,
             "source_rows_per_second": sum(self.data_provider.stats["source_rows"].values()) / elapsed,
             "data": self.data_provider.stats.copy(),
         }
-        logger.debug("[BacktestEngine.run] completed %s trading days; metrics remain STUBs", len(self.trading_dates))
         return self.metrics

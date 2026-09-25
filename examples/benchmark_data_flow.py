@@ -1,4 +1,4 @@
-"""Repeatable 2016-2022 source-to-engine benchmark; no trading-performance claims."""
+"""Repeatable data and cache-backed engine benchmark; financial algorithms are placeholders."""
 
 import argparse
 from contextlib import closing
@@ -88,6 +88,7 @@ def run_isolated(args, prefetch, scope):
     for name in ("data_dir", "start_date", "end_date", "lookback", "rebalance_interval",
                  "read_batch_months", "inference_delay_ms", "memory_sample_ms"):
         command.extend(["--" + name.replace("_", "-"), str(getattr(args, name))])
+    command.append("--async-inference" if args.async_inference else "--no-async-inference")
     result = subprocess.run(command, capture_output=True, text=True,
                             creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
     if result.returncode:
@@ -117,7 +118,7 @@ def run_once(args, prefetch, scope):
     engine = BacktestEngine(
         data_dir=args.data_dir, start_date=args.start_date, end_date=args.end_date,
         inference=inference, lookback=args.lookback, rebalance_interval=args.rebalance_interval,
-        read_batch_months=args.read_batch_months, prefetch=prefetch,
+        read_batch_months=args.read_batch_months, prefetch=prefetch, async_inference=args.async_inference,
     )
     if scope == "engine":
         engine.run()
@@ -179,6 +180,8 @@ def main():
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--scope", choices=("data", "engine", "both"), default="both")
     parser.add_argument("--inference-delay-ms", type=float, default=0)
+    parser.add_argument("--async-inference", action=argparse.BooleanOptionalAction, default=True,
+                        help="run model inference in its own bounded worker (engine scope only)")
     parser.add_argument("--memory-sample-ms", type=float, default=10)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--worker", choices=("data-sync", "data-async", "engine-sync", "engine-async"),
@@ -273,8 +276,10 @@ def main():
                   "Sampling may miss short peaks; actual gaps are reported. Sampling overhead is included. "
                   "Framework DEBUG logs disabled; worker JSON output and per-run console summaries occur after measurement. "
                   "Both scopes include signal checks/hashes and mock inference; data scope also touches daily prices. "
-                  "Engine scope includes pre-trade open and daily close accounting stubs and audit collection; "
-                  "data scope calls no financial modules. Financial algorithms remain unimplemented. "
+                  "Engine scope includes runtime cache exchanges, daily snapshots and financial placeholders; "
+                  "data scope calls no financial modules. "
+                  "async_inference controls a separate single model worker for the engine scope; "
+                  "the sync/async mode labels still refer only to data reading. "
                   "Sleep models only overlap opportunity.",
         "identical_playback": True, "summary": summary, "runs": runs,
     }

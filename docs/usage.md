@@ -2,7 +2,8 @@
 
 [项目首页](../README.md) · [使用说明](usage.md) · [实现设计](design.md) · [性能基线](benchmarks.md)
 
-以下命令均在项目根目录执行。当前金融算法仍为占位实现，示例用于验证数据通路。
+以下命令均在项目根目录执行。市场数据流、运行缓存和公共接口已实现；金融组件保留可运行的占位实现。
+当前示例通过 engine.run() 验证完整流程，金融指标仍为 None，表示尚未计算。
 
 ## 安装与运行
 
@@ -43,17 +44,18 @@ engine = BacktestEngine(
     holding_period=5,                # RankIC 标签持有期，交易日
     lookback=252,                    # 模型可见历史窗口，交易日
     read_batch_months=12,            # 每批最多 12 个自然月
-    prefetch=True,                   # 后台预取下一批；False 用于同步对照
+    prefetch=True,                   # 后台预取下一批行情
+    async_inference=True,            # 独立推理线程；False 使用同步推理
     price_mode="adjusted_return",
     optimizer_config=OptimizerConfig(top_k=50),
     cost_config=CostConfig(slippage=0.0),
 )
 metrics = engine.run()
 print(metrics)                       # 15 项指标，目前全部为 None
-print(engine.metrics)                # 同一份指标
-print(engine.trading_dates)          # 区间内实际遍历的全部交易日
-print(engine.tables["equity_curve"]) # 金融模块尚未实现，此表仍为空
-print(engine.performance)           # 读取、等待、推理、播放耗时与吞吐
+print(engine.metrics)
+print(engine.trading_dates)          # 实际遍历的全部交易日
+print(engine.tables["predictions"]) # 保留模型分数，future_return 尚未计算
+print(engine.performance)           # 读取、播放、推理及框架耗时
 ```
 
 已有设计文件中的模型时，只加载一次，再传入其方法句柄：
@@ -70,8 +72,15 @@ metrics = engine.run()
 ```
 
 句柄必须接受 `as_of_date`、`data` 两个关键字参数，返回 `date/code/score` 三列的
-`pandas.DataFrame`。引擎不负责动态导入模型、不重新初始化模型，也不执行训练。
+`pandas.DataFrame`。Runner 会验证当日日期、有限数值分数、代码唯一及完整覆盖当日合法池，
+然后按代码排序并发布缓存。引擎不负责动态导入模型、不重新初始化模型，也不执行训练。
 示例按当日 Barra 成分返回零分，仅演示数据通路。历史不足时提供已有数据，模型自行处理短窗口。
+
+默认模型在独立线程按信号日期顺序调用，可在账户处理当前调仓期间计算下一信号日。
+模型始终只接收对应日期的研究数据；账户在 Optimizer 需要当日分数时等待，缓存只由主线程访问。
+最多提前缓冲一个调仓间隔的日包，研究窗口按引用交给任务，不新增深拷贝。
+`async_inference=False` 恢复同步推理，`prefetch=False` 只关闭行情读取预取；两者独立。
+用户回调必须正常返回或抛出异常才能结束正在运行的线程。无需修改 model.predict 签名或 basic_usage 调用方式。
 
 ## 数据约定
 
@@ -105,7 +114,8 @@ YYYY-MM-DD 字符串，`code` 保留市场前缀。
 不填成可成交价格、不把缺失当零收益。股票跨年退出源数据覆盖时也不会从行情输入中消失。
 新出现的股票不会因为批次预取而提前出现在开盘/收盘输入中。
 开盘接口不携带当日 high/low/close/volume/amount；后复权价也不命名为 raw_open。
-基准权重和行业数据缺失，对应优化器输入仍为空，不使用等权假冒真实指数权重。
+基准权重和行业数据缺失时，通过 Dataset(status="unavailable", data=None, reason=...) 表达，
+不使用空表或等权假冒真实数据。DailyData.portfolio 仅承载当日 Barra，其他参考输入由 Reference Data 发布。
 
 依据现有 `D:\Data\README.md`：
 
@@ -118,7 +128,7 @@ YYYY-MM-DD 字符串，`code` 保留市场前缀。
 - `raw_price` 配置名保留，但当前运行会明确抛出 `NotImplementedError`；
   严格股数/现金交易需补齐真实价格等数据，不从 `amount/volume` 推造开盘价。
 
-当前完成数据播放和研究输入；真实交易、标签、基准收益和金融指标仍需后续实现。
+当前完成数据播放、研究输入、运行缓存与公共接口；真实交易、标签、外部参考数据适配和金融指标仍需后续实现。
 
 ## 独立数据 API
 
@@ -139,7 +149,8 @@ with closing(engine.data_provider.playback()) as days:
 ```
 
 完整遍历时自动回收线程；提前 break 或消费者可能抛出异常时使用 `closing`，确保及时回收。
-每次调用重新开始播放，不支持在同一个 DataProvider 上交错运行两个播放迭代器。
+独立调用从头播放；若已调用 prepare，则复用该准备结果而不重复启动读取。
+关闭后下一次重新准备。不支持在同一个 DataProvider 上交错运行两个播放迭代器。
 
 独立加载整个回测区间的估值输入：
 
@@ -159,8 +170,17 @@ selected = engine.data_provider.valuation_inputs(codes=["SZ000001", "SH600000"])
 必填：`data_dir`、`start_date`、`end_date`、`inference`。
 可选：`initial_cash`、`rebalance_interval`、`holding_period`、`lookback`、
 `price_mode`、`optimizer_config`、`cost_config`、`trading_days_per_year`、
-`risk_free_rate`、`output_dir`、`read_batch_months`（默认 12）、`prefetch`（默认 True）。
+`risk_free_rate`、`output_dir`、`read_batch_months`（默认 12）、`prefetch`（默认 True）、
+`async_inference`（默认 True），
+以及 `benchmark_mode`（默认 none）、`label_price_basis`（默认 adjusted_open）、
+`rights_policy`（默认 skip）、`data_capabilities` 和 `reference_sources`。
 无风险利率按年化小数配置，费率和权重均用小数。
+
+DataCapabilities 和 ReferenceSources 可从 skd_backtest 导入，分别声明数据能力和外部来源路径。
+配置为冻结数据类；已有默认源支持后复权研究数据、停牌、成分及 Barra。
+启用 csi300 需要基准日收益；基准相对优化和相应约束还需要权重、行业或暴露。
+能力声明不替代真实数据检查，也不会使尚未实现的文件适配器自动可用。
+完整字段及其关系见[接口协议](interfaces.md)。
 
 `OptimizerConfig` 包含方法、Top-K、Long Only、Fully Invested、个股权重、主动权重、
 行业暴露、Barra 风格暴露和换手限制。`None` 表示该限制未设置。
@@ -171,7 +191,9 @@ selected = engine.data_provider.valuation_inputs(codes=["SZ000001", "SH600000"])
 
 ## 返回指标与审计输出
 
-`engine.run()` 返回扁平字典，`engine.metrics` 保存同一份结果：
+`engine.run()` 返回以下扁平字典，`engine.metrics` 保存该结果。
+当前占位实现的 15 项指标全部为 None，表示尚未计算，不表示收益率为零。
+数据、模型或协议发生真实错误时仍会抛出异常，并保持 metrics=None、tables/account 为空。
 
 | 键 | 规格指标 |
 |---|---|
@@ -192,9 +214,15 @@ selected = engine.data_provider.valuation_inputs(codes=["SZ000001", "SH600000"])
 | `failed_orders` | Failed Orders |
 
 `engine.tables` 包含规格的七张审计表：`predictions`、`rankic`、`target_weights`、
-`orders`、`trades`、`positions`、`equity_curve`。当前只保留 inference 实际返回的
-所有调仓日的预测记录，并为 `future_return` 填 `None`，其他表为空。
-预测、交易及每日会计输出统一汇总；positions/equity_curve 当前为空是因为会计接口仍返回空表。每次 `run()` 重置运行状态。
+`orders`、`trades`、`positions`、`equity_curve`。缓存已按唯一生产者归集这些表：分数和标签由 Evaluator 合并，目标来自 Optimizer，
+订单/成交来自 Broker，持仓/净值来自 Accounting。Engine 只在完整运行及资源清理成功后
+接收输出对象的所有权，每次 run 重置运行状态。内部缓存使用只读约定下的共享引用，关闭时不修改导出的对象。
 
-Result Writer 预留 `metrics.json`、以上七个 `.csv` 和 `run.log`。
-即使指定 `output_dir`，当前也只在调试日志中记录计划输出的文件名，不创建文件或目录。
+当前 predictions 保留各信号日的模型分数，future_return 为 None；target_weights、orders、trades、
+positions 和 rankic 为空。equity_curve 每日有一行现金账户的交接记录，NAV、收益、换手及成本字段
+尚未计算，保持 None。账户仍为初始现金、无持仓。
+
+Result Writer 已实现 run.log，指定 output_dir 后在读取日历之前开始记录配置、阶段及错误，
+失败时也刷新并关闭。若目录已有协议输出文件（含 run.log），直接拒绝，需选择新目录。
+不配置 output_dir 时不写文件。metrics.json 和七张 CSV 的最终序列化尚未实现，
+write 记录 STUB 并发布 disabled 回执，继续返回内存占位结果；指定目录时当前只生成 run.log。

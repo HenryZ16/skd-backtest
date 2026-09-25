@@ -1,21 +1,22 @@
-"""Date-dependent fees and slippage."""
-
-import logging
+"""Fee-quotation placeholder; historical fees and slippage remain unimplemented."""
 
 from .config import CostConfig
-
-
-logger = logging.getLogger(__name__)
+from .contracts import CostQuote, Topic
+from .runtime_cache import CacheView
 
 
 class CostModel:
     def __init__(self, config: CostConfig):
         self.config = config
 
-    def calculate(self, *, date: str, side: str | None,
-                  trade_value: float | None) -> dict[str, float | None]:
-        # TODO: 按 date 选择生效费率，计算佣金/最低佣金、卖出印花税、过户费。
-        # Broker 按买卖方向将 slippage 应用于开盘价；不得全历史写死同一税率。
-        # 当前 None 参数只用于空流程演示，不代表发生了金额为零的交易。
-        logger.debug("[CostModel.calculate] STUB date=%s; no fees calculated", date)
-        return dict.fromkeys(("commission", "stamp_tax", "other_cost", "total_cost"))
+    def calculate(self, *, date: str, request_id: int, cache: CacheView) -> None:
+        request = cache.read(Topic.COST_REQUEST, (date, request_id))
+        # TODO: Apply directional slippage and the transaction date's commission/tax schedule.
+        value = (request.base_price * request.shares if request.price_mode == "raw_price"
+                 else request.position_value)
+        cache.log(level="DEBUG", message="STUB fee quote: zero fees and no slippage")
+        cache.publish(Topic.COST_RESULT, (date, request_id), CostQuote(
+            request_id, request.order_id, date, request.side, request.price_mode,
+            request.base_price, value, value, 0.0, 0.0, 0.0, 0.0,
+            -value if request.side == "BUY" else value,
+        ))

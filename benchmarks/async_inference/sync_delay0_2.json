@@ -1,0 +1,204 @@
+{
+  "source": "current",
+  "source_ref": null,
+  "mode": "baseline",
+  "end": "2022-12-31",
+  "prefetch": true,
+  "async_inference": false,
+  "inference_delay_ms": 0.0,
+  "wall_seconds": 8.727292199997464,
+  "process_cpu_seconds": 10.5625,
+  "main_thread_cpu_seconds": 7.53125,
+  "process_cpu_over_wall": 1.2102837578880503,
+  "main_thread_cpu_over_wall": 0.8629538037012429,
+  "rss_peak_mib": 590.3828125,
+  "rss_mean_mib": 474.1912318814541,
+  "io_read_bytes": 180086537,
+  "io_write_bytes": 0,
+  "performance": {
+    "elapsed_seconds": 8.727192899998045,
+    "playback_seconds": 8.548011799997767,
+    "inference_seconds": 0.5936331000557402,
+    "inference_wait_seconds": 0.0,
+    "inference_calls": 341,
+    "trading_days": 1703,
+    "market_rows": 803524,
+    "days_per_second": 195.13720156230093,
+    "source_rows_per_second": 193805.27271264727,
+    "data": {
+      "calendar_files": 84,
+      "calendar_seconds": 0.1292152999958489,
+      "data_files": 252,
+      "data_bytes": 158772790,
+      "batches": 7,
+      "read_seconds": 2.987003000002005,
+      "wait_seconds": 0.22007699999085162,
+      "as_of_seconds": 1.7905672000342747,
+      "source_rows": {
+        "Factor33_winsor": 590238,
+        "Barra_factor": 510900,
+        "MarketData": 590238
+      },
+      "delivered_rows": {
+        "Factor33_winsor": 23851800,
+        "Barra_factor": 23851800,
+        "MarketData": 23851800
+      },
+      "warmup_days": 0,
+      "seed_files": 0,
+      "seed_rows": 0,
+      "open_rows": 803524,
+      "close_rows": 803524,
+      "market_seconds": 3.3052271003689384
+    }
+  },
+  "outputs": {
+    "predictions": {
+      "rows": 102300,
+      "columns": [
+        "date",
+        "code",
+        "score",
+        "future_return"
+      ],
+      "sha256": "c7376ad254cdb8e68f07a8c40fb04093756c366552ec7968abfe79d12f533bb4"
+    },
+    "rankic": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "rankic",
+        "n_stocks"
+      ],
+      "sha256": "ece6c06e464952bb299cea027b7daac0ac31ee7f858f43e70c2dbe9eca40d114"
+    },
+    "target_weights": {
+      "rows": 0,
+      "columns": [
+        "signal_date",
+        "execution_date",
+        "code",
+        "score",
+        "benchmark_weight",
+        "target_weight"
+      ],
+      "sha256": "6794dbe7a2d9285948a5e87ff440c8ad877e2b86c5fd6889e0f995de71c04a06"
+    },
+    "orders": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "side",
+        "requested_shares",
+        "status",
+        "reject_reason",
+        "order_id",
+        "signal_date",
+        "requested_value",
+        "filled_shares",
+        "filled_value"
+      ],
+      "sha256": "397b8bf3928223d125c28493d5ef709c9c2d256e72d6cf72714ccd1a3513b503"
+    },
+    "trades": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "side",
+        "shares",
+        "price",
+        "trade_value",
+        "commission",
+        "stamp_tax",
+        "other_cost",
+        "total_cost",
+        "order_id",
+        "signal_date",
+        "position_value"
+      ],
+      "sha256": "97a6f81655619f26f1de5d393e6af571c0727117e4672501d65f3fd4f11f9dec"
+    },
+    "positions": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "shares",
+        "sellable_shares",
+        "close",
+        "market_value",
+        "weight"
+      ],
+      "sha256": "7ec7d63ef86f77b988ccadc9c62115f15eb977d1abab19059d27e7b74f81303f"
+    },
+    "equity_curve": {
+      "rows": 1703,
+      "columns": [
+        "date",
+        "cash",
+        "market_value",
+        "portfolio_value",
+        "portfolio_nav",
+        "portfolio_return",
+        "benchmark_nav",
+        "benchmark_return",
+        "active_return",
+        "turnover",
+        "transaction_cost"
+      ],
+      "sha256": "e16c8d012a6751d705251c53dcea405c42208324d769f3f522112bf2b9e697aa"
+    }
+  },
+  "metrics": {
+    "mean_rankic": null,
+    "rankic_std": null,
+    "rankic_ir": null,
+    "positive_rankic_ratio": null,
+    "total_return": null,
+    "annualized_return": null,
+    "annualized_excess_return": null,
+    "annualized_volatility": null,
+    "maximum_drawdown": null,
+    "tracking_error": null,
+    "information_ratio": null,
+    "sharpe_ratio": null,
+    "turnover": null,
+    "transaction_cost": null,
+    "failed_orders": null
+  },
+  "inventory": {},
+  "clone_schemas": {},
+  "environment": {
+    "python": "3.13.13",
+    "pandas": "3.0.6",
+    "pyarrow": "25.0.1",
+    "psutil": "7.2.2",
+    "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "logical_cpus": 32,
+    "platform": "Windows-11-10.0.26200-SP0"
+  },
+  "head": "94e22c7aa4100955e1606c2cec632a7fd41a9ca9",
+  "source_sha256": {
+    "__init__.py": "1cd17c99f9103369d6deda77677981d04344dab16dc814b1a1f03d7f5c59afa0",
+    "accounting.py": "f2bb6347163ee7f65134f364f1823455e6470553e8768a578a5771f4234db46b",
+    "broker.py": "655236e9faed65df0c37fd2508e36ce0ba1af6adbe27b631cedca63ea6b1a306",
+    "config.py": "a132552448579a0c4d97c6e6654de6c3350d020ae95633ce8aecbe5844421b10",
+    "contracts.py": "173932af34fa2e9a022b2c10ead1b7b6212245dd33c74c62b32fe197f7463244",
+    "corporate_actions.py": "bf2bbcd00995d315b30c1d8f68e10828f501b5d8f169824d8e4f0b6ee4d45880",
+    "cost_model.py": "86ec63e5592bc4db4675f0c8dc99c2dbd91af23c93b667958f82fc0d00f82a6b",
+    "data_provider.py": "6589b4f5b55cb004f69a99886edcb59a341bf98a8b6049da3539ebc5f49c6743",
+    "engine.py": "7574aeeb25d91876685103e51e09e914b0e7417ffdcfe5d07f99f602102b949c",
+    "inference_pipeline.py": "193c16ad550c9bcd2b2bf20c803d0791d2451adad2a1e09877a950e1e23db904",
+    "label_provider.py": "f88420970d44ec03c32a73d2d689200617d6e141d2cb2740080c1a2ac8b139c5",
+    "metrics.py": "3c4138d9bb9ab292583ea9cc01820f991f7f7a0e0239ffe6d4fd13f00fca378b",
+    "portfolio_optimizer.py": "bc8d20a12a4149ccb90451c0bdd8fdb4d25711e96d1f93d4caf8df0d565ea3a4",
+    "prediction_evaluator.py": "ab24d9575d2c8f942f1e7707bf10208e935e8b8803e36a42e07281d5f26e31e7",
+    "reference_data.py": "e0a8513accf2c4b6d31943689c862d9b1387054075f39c336c9605363a0269b1",
+    "result_writer.py": "7ce8ecc1a1308493744611d7db4ec28cfa816de6127f2fb6012ce8a7c084c7c6",
+    "runtime_cache.py": "49bff8ef6e684b6d42777f5cd7a431357ae4b36244d0d66331ac2cc5b04b0d31",
+    "schemas.py": "c18b79e331f1ac28df9a00331ce4ee2e49a900e8326420139c8e0bc5c2023218",
+    "submission_runner.py": "3465072063ea91f4a5ebac67f986cc7bef5546274e960bf35a5ee22560efe5dd"
+  }
+}

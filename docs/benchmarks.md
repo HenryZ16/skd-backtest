@@ -3,6 +3,11 @@
 [项目首页](../README.md) · [使用说明](usage.md) · [实现设计](design.md) · [性能基线](benchmarks.md)
 
 以下命令均在项目根目录执行，原始测量报告保存在 `benchmarks/`。
+报告保存缓存接入前的历史基线、缓存优化后的空跑对照，以及当前异步推理的对照实验。
+缓存优化的同步推理基线达到纯数据空跑吞吐率的 **75.49%（异步读取）**、**77.28%（同步读取）**；
+该比例尚未包含异步推理，不作为当前默认配置的测量值。
+当前异步推理在每次附加 20 ms 模拟延迟时，将完整运行平均耗时从 15.356 秒降至 9.263 秒；
+无附加延迟的极轻模型则从 8.764 秒增至 9.193 秒。金融算法仍未实现，这些数值衡量数据通路与占位框架。
 
 ## 数据吞吐基线
 
@@ -13,12 +18,15 @@ python -m pip install -e ".[benchmark]"
 ```
 
 ```powershell
-.venv\Scripts\python.exe examples/benchmark_data_flow.py --data-dir D:\Data --output benchmarks/data_flow_2016_2022.json
-.venv\Scripts\python.exe examples/benchmark_data_flow.py --data-dir D:\Data --inference-delay-ms 10 --output benchmarks/data_flow_2016_2022_delay10ms.json
+.venv\Scripts\python.exe examples/benchmark_data_flow.py --data-dir D:\Data --output benchmarks/data_flow_current.json
+.venv\Scripts\python.exe examples/benchmark_data_flow.py --data-dir D:\Data --inference-delay-ms 10 --output benchmarks/data_flow_delay10ms_current.json
 ```
 
 脚本默认覆盖 `2016-01-01 .. 2022-12-31`，窗口 252 个交易日、每 5 日推理、
-每批 12 个月。`--scope both`（默认）分别运行纯数据播放和完整框架；也可选 `data` 或 `engine`。
+每批 12 个月。`--scope both`（默认）分别运行独立数据播放和完整框架；也可选 data 或 engine。
+engine 范围包含运行缓存、逐日协议快照、金融占位调用和审计收集，不代表真实金融算法的性能。
+读数模式 sync/async 只控制后台读取；engine 默认另启用异步推理，可用 `--no-async-inference` 关闭。
+data 范围直接调用测试模型，不创建推理线程；比较推理流水线时应在 engine 范围内比较两种推理配置。
 每个范围、每种读数模式先预热一次，再交替顺序运行 3 次并取中位数。
 每次运行使用独立子进程，避免上一轮 Python/Arrow 分配器保留内存影响下一轮的占用；
 预热针对操作系统文件缓存，子进程启动和导入耗时不计入运行时间。
@@ -37,7 +45,53 @@ python -m pip install -e ".[benchmark]"
 汇总的 `peak_rss_mib`、`mean_rss_mib` 分别取各次峰值、平均值的中位数，1 MiB = 1,048,576 字节。
 这些指标只加入 benchmark 报告，不改变 `engine.performance` 或模型接口。
 
-本机基线（Windows、Python 3.13.13、pandas 3.0.6、pyarrow 25.0.1、psutil 7.2.2）：
+## 缓存优化后的空跑带宽比例（同步推理基线）
+
+“空跑”使用现有 benchmark 的 data 范围：读取每日行情、构造研究窗口、执行相同的窗口检查/信号摘要及零分推理，
+并消费每日价格摘要；不调用运行缓存或金融组件。engine 范围运行优化后的完整占位框架。
+两者消费者工作并不完全相同，因此该比例表示相对于这项空跑基准的有效吞吐，耗时差不能全部归为缓存自身开销。
+
+同一批 252 个 Parquet 文件，共 158,772,790 字节（151.418 MiB）、1,691,376 行源数据，
+覆盖 1,703 个交易日、341 次推理；每个范围和模式预热一次，交替顺序独立进程运行三次，取中位数。
+12 次正式运行的交付计数及信号数据摘要一致，源文件内容摘要与历史数据流基线一致。
+
+有效带宽 = 输入 Parquet 文件总字节数 / 2²⁰ / 完整运行耗时，单位 MiB/s。
+达到空跑的百分比 = 框架有效带宽 / 空跑有效带宽 × 100%
+= 空跑耗时中位数 / 框架耗时中位数 × 100%。
+这里衡量端到端数据通路吞吐，不是物理磁盘或 DRAM 带宽；源行数/秒使用同一比例。
+
+| 读取模式 | 空跑耗时中位数 | 框架耗时中位数 | 空跑 MiB/s | 框架 MiB/s | 达到空跑吞吐率 |
+|---|---:|---:|---:|---:|---:|
+| 同步 | 8.440 s | 10.921 s | 17.94 | 13.86 | **77.28%** |
+| 异步读取 | 8.052 s | 10.666 s | 18.80 | 14.20 | **75.49%** |
+
+该基线异步读取的源行吞吐分别为 210,051 行/秒（空跑）和 158,573 行/秒（框架），即 **75.49%**。
+
+原始读数见 [优化后同口径报告](../benchmarks/data_flow_optimized_2016_2022.json)，
+缓存优化及函数热点见 [优化验证报告](../benchmarks/runtime_cache_profile/REPORT.md)。
+本表使用 benchmark 的检查/摘要回调；与 basic_usage 回调的 9.034 秒测量分开记录。
+
+~~~powershell
+.venv\Scripts\python.exe -B examples/benchmark_data_flow.py --data-dir D:\Data --scope both --repeats 3 --no-async-inference --output benchmarks/data_flow_optimized_recheck.json
+~~~
+
+## 异步推理对照
+
+原 basic_usage 模型、七年区间、后台读取开启，每组独立进程运行两次，取平均值：
+
+| 每次附加推理延迟 | 同步推理 | 异步推理 | 总耗时变化 |
+|---|---:|---:|---:|
+| 0 ms | 8.764 s | 9.193 s | 增加 4.9% |
+| 20 ms | 15.356 s | 9.263 s | 减少 39.7% |
+
+八次运行的七张结果表内容摘要及 15 项指标完全一致；未修改 basic_usage.py。
+20 ms 使用 sleep 模拟可与主线程重叠的推理时间，不是 XGBoost 实测。
+与前节空跑对照使用不同回调和采样间隔，不混用耗时计算空跑百分比。
+逐次数据、内存占用、等待计时与复测命令见 [异步推理验证报告](../benchmarks/async_inference/REPORT.md)。
+
+## 缓存接入前的历史基线
+
+历史环境：Windows、Python 3.13.13、pandas 3.0.6、pyarrow 25.0.1、psutil 7.2.2。
 2016-01-04 至 2022-12-30 共 1,703 个交易日、341 次推理；252 个完整数据文件，
 三套源表合计 1,691,376 行，其中源行情 590,238 行。开盘和收盘端各交付 803,524 行，
 包含已出现但当天缺失的股票保留行，因此交付行数大于源行数。
@@ -55,11 +109,16 @@ python -m pip install -e ".[benchmark]"
 逐次数据见 [无附加延迟报告](../benchmarks/data_flow_2016_2022.json) 和
 [10 ms 推理延迟报告](../benchmarks/data_flow_2016_2022_delay10ms.json)。
 
-`engine.performance` 与金融指标分开，包括：
+## 运行指标与解释
 
-- `elapsed_seconds`：完整引擎运行耗时，含日历准备、读取、播放、推理和金融占位模块。
-- `playback_seconds`、`inference_seconds`：数据播放（含日历准备）及用户推理耗时；
-  `trading_days`、`market_rows`、`inference_calls` 为交易日、交付开盘行（含缺失行）、推理次数。
+当前成功运行后的 `engine.performance` 与金融指标分开，包括：
+
+- `elapsed_seconds`：完整引擎运行耗时，含日历准备、读取、播放、推理、缓存及配置的业务模块。
+- `playback_seconds`：逐日流水线耗时，不含先行日历准备。
+- `inference_seconds`：异步推理时为工作线程内模型调用及分数校验的累计经过时间；
+  同步推理时为 Runner 完整调用时间。它不是 CPU 时间，也不表示主线程等待时间。
+- `inference_wait_seconds`：主线程在信号阶段等待推理 Future 的累计时间；同步推理时为 0。
+- `trading_days`、`market_rows`、`inference_calls`：交易日、交付开盘行（含缺失行）、推理次数。
 - `days_per_second`、`source_rows_per_second`：以完整运行耗时为分母的吞吐。
 - `data.calendar_seconds`：日历准备耗时；`data.read_seconds`：批次读取、过滤、排序的累计工作耗时；
   `data.wait_seconds`：前台取得批次的累计等待，包含首批启动等待。
@@ -73,9 +132,10 @@ python -m pip install -e ".[benchmark]"
 后台工作耗时与播放/推理可以重叠，各阶段计时不能简单相加。
 基准禁用框架调试日志；子进程的 JSON 结果及每轮摘要均在测量结束后输出。
 纯数据范围实际读取每日价格、构造信号日研究窗口并调用
-测试推理函数，不调用金融占位模块；完整框架范围包括开盘估值、每日收盘核算等金融占位调用及审计收集，
-尚不计算实际市值或收益。
+测试推理函数，不调用金融模块。现存报告的完整框架范围包含当时的开盘估值、每日收盘核算等占位调用及审计收集，
+没有计算实际市值或收益；完整业务实现后的性能必须另行测量。
 两者均含测试推理中的窗口检查、信号日摘要和可选模拟延迟。纯数据消费者耗时另记为 consumer_seconds。
 文件摘要和预热会使操作系统缓存变热，因此这是本机缓存条件下的数据通路基线，
 不是冷盘顺序读取速度，也不代表已实现金融算法后的回测速度。
-模拟推理使用 sleep，仅衡量可隐藏读取的机会，不代表 CPU 密集型模型的实际加速。
+模拟推理使用 sleep，用于测量读取、推理与账户流水线的重叠机会，不代表 CPU 密集型模型的实际加速。
+受 GIL 限制的纯 Python 推理不会因新增线程获得 CPU 并行；真实模型及其内部线程数需另行测量。

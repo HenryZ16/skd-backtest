@@ -1,0 +1,2866 @@
+{
+  "source": "current",
+  "mode": "cprofile",
+  "end": "2016-12-31",
+  "wall_seconds": 13.63486720000219,
+  "process_cpu_seconds": 13.59375,
+  "main_thread_cpu_seconds": 13.28125,
+  "process_cpu_over_wall": 0.9969844077394326,
+  "main_thread_cpu_over_wall": 0.9740652259523193,
+  "rss_peak_mib": 301.1875,
+  "rss_mean_mib": 261.16922947598607,
+  "io_read_bytes": 25831549,
+  "io_write_bytes": 0,
+  "performance": {
+    "elapsed_seconds": 13.633176499999536,
+    "playback_seconds": 13.446001200005412,
+    "inference_seconds": 0.21384690000559203,
+    "inference_calls": 49,
+    "trading_days": 244,
+    "market_rows": 85836,
+    "days_per_second": 17.89751640052546,
+    "source_rows_per_second": 17961.478016514226,
+    "data": {
+      "calendar_files": 12,
+      "calendar_seconds": 0.047704099997645244,
+      "data_files": 36,
+      "data_bytes": 22585830,
+      "batches": 1,
+      "read_seconds": 0.25700659999711206,
+      "wait_seconds": 0.2541242000006605,
+      "as_of_seconds": 0.1528402999683749,
+      "source_rows": {
+        "Factor33_winsor": 85836,
+        "Barra_factor": 73200,
+        "MarketData": 85836
+      },
+      "delivered_rows": {
+        "Factor33_winsor": 1778700,
+        "Barra_factor": 1778700,
+        "MarketData": 1778700
+      },
+      "warmup_days": 0,
+      "seed_files": 0,
+      "seed_rows": 0,
+      "open_rows": 85836,
+      "close_rows": 85836,
+      "market_seconds": 0.893963900001836
+    }
+  },
+  "outputs": {
+    "predictions": {
+      "rows": 14700,
+      "columns": [
+        "date",
+        "code",
+        "score",
+        "future_return"
+      ],
+      "sha256": "7a9919aabd71de4cbcc65d71c76dd4631730fc93e6b34fd05fda7bb462fab409"
+    },
+    "rankic": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "rankic",
+        "n_stocks"
+      ],
+      "sha256": "ece6c06e464952bb299cea027b7daac0ac31ee7f858f43e70c2dbe9eca40d114"
+    },
+    "target_weights": {
+      "rows": 0,
+      "columns": [
+        "signal_date",
+        "execution_date",
+        "code",
+        "score",
+        "benchmark_weight",
+        "target_weight"
+      ],
+      "sha256": "6794dbe7a2d9285948a5e87ff440c8ad877e2b86c5fd6889e0f995de71c04a06"
+    },
+    "orders": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "side",
+        "requested_shares",
+        "status",
+        "reject_reason",
+        "order_id",
+        "signal_date",
+        "requested_value",
+        "filled_shares",
+        "filled_value"
+      ],
+      "sha256": "397b8bf3928223d125c28493d5ef709c9c2d256e72d6cf72714ccd1a3513b503"
+    },
+    "trades": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "side",
+        "shares",
+        "price",
+        "trade_value",
+        "commission",
+        "stamp_tax",
+        "other_cost",
+        "total_cost",
+        "order_id",
+        "signal_date",
+        "position_value"
+      ],
+      "sha256": "97a6f81655619f26f1de5d393e6af571c0727117e4672501d65f3fd4f11f9dec"
+    },
+    "positions": {
+      "rows": 0,
+      "columns": [
+        "date",
+        "code",
+        "shares",
+        "sellable_shares",
+        "close",
+        "market_value",
+        "weight"
+      ],
+      "sha256": "7ec7d63ef86f77b988ccadc9c62115f15eb977d1abab19059d27e7b74f81303f"
+    },
+    "equity_curve": {
+      "rows": 244,
+      "columns": [
+        "date",
+        "cash",
+        "market_value",
+        "portfolio_value",
+        "portfolio_nav",
+        "portfolio_return",
+        "benchmark_nav",
+        "benchmark_return",
+        "active_return",
+        "turnover",
+        "transaction_cost"
+      ],
+      "sha256": "f30799aea6a5bb376d01d05eace3792379d48ef425027a89a39506ab0a794a83"
+    }
+  },
+  "metrics": {
+    "mean_rankic": null,
+    "rankic_std": null,
+    "rankic_ir": null,
+    "positive_rankic_ratio": null,
+    "total_return": null,
+    "annualized_return": null,
+    "annualized_excess_return": null,
+    "annualized_volatility": null,
+    "maximum_drawdown": null,
+    "tracking_error": null,
+    "information_ratio": null,
+    "sharpe_ratio": null,
+    "turnover": null,
+    "transaction_cost": null,
+    "failed_orders": null
+  },
+  "inventory": {},
+  "clone_schemas": {},
+  "environment": {
+    "python": "3.13.13",
+    "pandas": "3.0.6",
+    "pyarrow": "25.0.1",
+    "psutil": "7.2.2",
+    "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "logical_cpus": 32,
+    "platform": "Windows-11-10.0.26200-SP0"
+  },
+  "head": "94e22c7aa4100955e1606c2cec632a7fd41a9ca9",
+  "source_sha256": {
+    "__init__.py": "1cd17c99f9103369d6deda77677981d04344dab16dc814b1a1f03d7f5c59afa0",
+    "accounting.py": "f2bb6347163ee7f65134f364f1823455e6470553e8768a578a5771f4234db46b",
+    "broker.py": "655236e9faed65df0c37fd2508e36ce0ba1af6adbe27b631cedca63ea6b1a306",
+    "config.py": "d35374705b03aa2fa10323dbd58020ffe23c5540e8ed92e35a12421796a6bf2f",
+    "contracts.py": "173932af34fa2e9a022b2c10ead1b7b6212245dd33c74c62b32fe197f7463244",
+    "corporate_actions.py": "9392c87ad16b9084ec29b56f6c3dd3bd42e7ab983eed22feca0dc19b8792f60d",
+    "cost_model.py": "86ec63e5592bc4db4675f0c8dc99c2dbd91af23c93b667958f82fc0d00f82a6b",
+    "data_provider.py": "6589b4f5b55cb004f69a99886edcb59a341bf98a8b6049da3539ebc5f49c6743",
+    "engine.py": "958d77d36aa6cdcddba012cad9a6c59a4d649e49127420cb8cb237bcb3f31346",
+    "label_provider.py": "f88420970d44ec03c32a73d2d689200617d6e141d2cb2740080c1a2ac8b139c5",
+    "metrics.py": "3c4138d9bb9ab292583ea9cc01820f991f7f7a0e0239ffe6d4fd13f00fca378b",
+    "portfolio_optimizer.py": "bc8d20a12a4149ccb90451c0bdd8fdb4d25711e96d1f93d4caf8df0d565ea3a4",
+    "prediction_evaluator.py": "ab24d9575d2c8f942f1e7707bf10208e935e8b8803e36a42e07281d5f26e31e7",
+    "reference_data.py": "7547609ad2080a7663d7853a73c49e3643c5c6f169fc41e600900bdf0d00a215",
+    "result_writer.py": "7ce8ecc1a1308493744611d7db4ec28cfa816de6127f2fb6012ce8a7c084c7c6",
+    "runtime_cache.py": "93c18dd896e5e435bd71d21389001eaf52d0799f2260eb040e71fcbc84cee919",
+    "schemas.py": "c18b79e331f1ac28df9a00331ce4ee2e49a900e8326420139c8e0bc5c2023218",
+    "submission_runner.py": "40c4e4ad7d61afadbab459d4940e25da9ac8ee65588236b36e5f3b116da66d47"
+  },
+  "profile": {
+    "total_calls": 35124653,
+    "primitive_calls": 34091007,
+    "total_seconds": 13.620886099999947,
+    "by_cumulative": [
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 308,
+        "function": "playback",
+        "primitive_calls": 245,
+        "calls": 245,
+        "self_seconds": 0.0012958000000000002,
+        "cumulative_seconds": 14.7907422
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\engine.py",
+        "line": 78,
+        "function": "run",
+        "primitive_calls": 1,
+        "calls": 2,
+        "self_seconds": 0.0003902,
+        "cumulative_seconds": 13.6272514
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 78,
+        "function": "__exit__",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 1.04e-05,
+        "cumulative_seconds": 13.449715800000002
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 81,
+        "function": "close",
+        "primitive_calls": 3,
+        "calls": 3,
+        "self_seconds": 0.0017433000000000001,
+        "cumulative_seconds": 13.4496754
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\concurrent\\futures\\thread.py",
+        "line": 220,
+        "function": "shutdown",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 1.6000000000000001e-06,
+        "cumulative_seconds": 13.4478866
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\threading.py",
+        "line": 1059,
+        "function": "join",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 0.0347422,
+        "cumulative_seconds": 13.4478846
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\engine.py",
+        "line": 89,
+        "function": "call",
+        "primitive_calls": 2104,
+        "calls": 2104,
+        "self_seconds": 0.0101776,
+        "cumulative_seconds": 9.3441533
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 492,
+        "function": "publish",
+        "primitive_calls": 1909,
+        "calls": 1909,
+        "self_seconds": 0.0023913000000000003,
+        "cumulative_seconds": 7.367392700000001
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 271,
+        "function": "_publish",
+        "primitive_calls": 1909,
+        "calls": 1909,
+        "self_seconds": 0.0093825,
+        "cumulative_seconds": 7.3632425
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 83,
+        "function": "_clone",
+        "primitive_calls": 4464,
+        "calls": 129551,
+        "self_seconds": 0.23178580000000001,
+        "cumulative_seconds": 7.0584633000000006
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 487,
+        "function": "read",
+        "primitive_calls": 2300,
+        "calls": 2300,
+        "self_seconds": 0.0031854,
+        "cumulative_seconds": 3.7180562000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 332,
+        "function": "_validate",
+        "primitive_calls": 1909,
+        "calls": 1909,
+        "self_seconds": 0.026823100000000002,
+        "cumulative_seconds": 3.6448839000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4337,
+        "function": "__getitem__",
+        "primitive_calls": 83669,
+        "calls": 83669,
+        "self_seconds": 0.15274590000000002,
+        "cumulative_seconds": 3.2506542
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\accounting.py",
+        "line": 22,
+        "function": "mark_to_market",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0042141,
+        "cumulative_seconds": 3.1937870000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\corporate_actions.py",
+        "line": 15,
+        "function": "apply",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0034507,
+        "cumulative_seconds": 3.0287587
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 100,
+        "function": "_frame",
+        "primitive_calls": 4445,
+        "calls": 4445,
+        "self_seconds": 0.031428700000000004,
+        "cumulative_seconds": 2.6853193
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method builtins.next>",
+        "primitive_calls": 662,
+        "calls": 662,
+        "self_seconds": 0.0013532000000000001,
+        "cumulative_seconds": 2.5262134
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\broker.py",
+        "line": 21,
+        "function": "execute",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0021362,
+        "cumulative_seconds": 2.5248325
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4559,
+        "function": "__setitem__",
+        "primitive_calls": 47282,
+        "calls": 47282,
+        "self_seconds": 0.10931080000000001,
+        "cumulative_seconds": 2.3067482000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4864,
+        "function": "_set_item",
+        "primitive_calls": 47282,
+        "calls": 47282,
+        "self_seconds": 0.0612578,
+        "cumulative_seconds": 2.14032
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\series.py",
+        "line": 369,
+        "function": "__init__",
+        "primitive_calls": 61669,
+        "calls": 61669,
+        "self_seconds": 0.2384069,
+        "cumulative_seconds": 2.0418899
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\series.py",
+        "line": 4506,
+        "function": "map",
+        "primitive_calls": 46783,
+        "calls": 46783,
+        "self_seconds": 0.0878879,
+        "cumulative_seconds": 1.9822154
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4848,
+        "function": "_set_item_mgr",
+        "primitive_calls": 47282,
+        "calls": 47282,
+        "self_seconds": 0.033920200000000005,
+        "cumulative_seconds": 1.6008244
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 6288,
+        "function": "_get_indexer_strict",
+        "primitive_calls": 4839,
+        "calls": 4839,
+        "self_seconds": 0.022607600000000002,
+        "cumulative_seconds": 1.5158488
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4968,
+        "function": "_get_item",
+        "primitive_calls": 80436,
+        "calls": 80436,
+        "self_seconds": 0.0409168,
+        "cumulative_seconds": 1.4585290000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4292,
+        "function": "_ixs",
+        "primitive_calls": 85089,
+        "calls": 85089,
+        "self_seconds": 0.0471448,
+        "cumulative_seconds": 1.4487322
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4838,
+        "function": "_iset_item_mgr",
+        "primitive_calls": 46786,
+        "calls": 46786,
+        "self_seconds": 0.0440477,
+        "cumulative_seconds": 1.4215280000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\construction.py",
+        "line": 531,
+        "function": "sanitize_array",
+        "primitive_calls": 90621,
+        "calls": 90621,
+        "self_seconds": 0.44074040000000003,
+        "cumulative_seconds": 1.390814
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1280,
+        "function": "iset",
+        "primitive_calls": 46786,
+        "calls": 46786,
+        "self_seconds": 0.45308940000000003,
+        "cumulative_seconds": 1.3774803
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\accounting.py",
+        "line": 15,
+        "function": "mark_at_open",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0012115000000000001,
+        "cumulative_seconds": 1.1900005
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6548,
+        "function": "copy",
+        "primitive_calls": 13805,
+        "calls": 13805,
+        "self_seconds": 0.0146478,
+        "cumulative_seconds": 1.1185865000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\broker.py",
+        "line": 16,
+        "function": "start_day",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0019825000000000003,
+        "cumulative_seconds": 1.0595096000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 739,
+        "function": "copy",
+        "primitive_calls": 13862,
+        "calls": 13862,
+        "self_seconds": 0.032778100000000004,
+        "cumulative_seconds": 1.0330044
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method builtins.isinstance>",
+        "primitive_calls": 8081459,
+        "calls": 8087959,
+        "self_seconds": 0.7335952,
+        "cumulative_seconds": 1.0237302000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 3656,
+        "function": "get_indexer",
+        "primitive_calls": 9098,
+        "calls": 9098,
+        "self_seconds": 0.0346546,
+        "cumulative_seconds": 1.0057746
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1192,
+        "function": "__getitem__",
+        "primitive_calls": 5527,
+        "calls": 7139,
+        "self_seconds": 0.013580700000000001,
+        "cumulative_seconds": 0.9462692
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 317,
+        "function": "_account",
+        "primitive_calls": 1220,
+        "calls": 1220,
+        "self_seconds": 0.0029731000000000002,
+        "cumulative_seconds": 0.9256839
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4956,
+        "function": "_box_col_values",
+        "primitive_calls": 81863,
+        "calls": 81863,
+        "self_seconds": 0.07821360000000001,
+        "cumulative_seconds": 0.8974991000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 7919,
+        "function": "ensure_index",
+        "primitive_calls": 146149,
+        "calls": 146149,
+        "self_seconds": 0.0406207,
+        "cumulative_seconds": 0.8813027000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6179,
+        "function": "__getattr__",
+        "primitive_calls": 92009,
+        "calls": 92009,
+        "self_seconds": 0.052590700000000004,
+        "cumulative_seconds": 0.8751412000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 486,
+        "function": "__new__",
+        "primitive_calls": 14417,
+        "calls": 14417,
+        "self_seconds": 0.07854570000000001,
+        "cumulative_seconds": 0.8571611
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 6252,
+        "function": "get_indexer_for",
+        "primitive_calls": 5378,
+        "calls": 5378,
+        "self_seconds": 0.008549300000000001,
+        "cumulative_seconds": 0.8003675
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1383,
+        "function": "_getitem_tuple",
+        "primitive_calls": 1612,
+        "calls": 3175,
+        "self_seconds": 0.011090200000000001,
+        "cumulative_seconds": 0.7768293000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1058,
+        "function": "_getitem_lowerdim",
+        "primitive_calls": 1614,
+        "calls": 3177,
+        "self_seconds": 0.0157738,
+        "cumulative_seconds": 0.7690929000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 281,
+        "function": "open_market",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0031932,
+        "cumulative_seconds": 0.7074576
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 254,
+        "function": "_slice",
+        "primitive_calls": 684,
+        "calls": 684,
+        "self_seconds": 0.0057332,
+        "cumulative_seconds": 0.6575247000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 399,
+        "function": "apply",
+        "primitive_calls": 20332,
+        "calls": 20332,
+        "self_seconds": 0.094485,
+        "cumulative_seconds": 0.6326667
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1415,
+        "function": "_getitem_axis",
+        "primitive_calls": 1662,
+        "calls": 1662,
+        "self_seconds": 0.0040434,
+        "cumulative_seconds": 0.6156426
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 702,
+        "function": "__init__",
+        "primitive_calls": 1813,
+        "calls": 1813,
+        "self_seconds": 0.009573700000000001,
+        "cumulative_seconds": 0.6037014
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1352,
+        "function": "_getitem_iterable",
+        "primitive_calls": 1563,
+        "calls": 1563,
+        "self_seconds": 0.0024889,
+        "cumulative_seconds": 0.5901842
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 4147,
+        "function": "reindex",
+        "primitive_calls": 4840,
+        "calls": 4840,
+        "self_seconds": 0.0102182,
+        "cumulative_seconds": 0.5528824
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6309,
+        "function": "dtypes",
+        "primitive_calls": 9535,
+        "calls": 9535,
+        "self_seconds": 0.013328900000000001,
+        "cumulative_seconds": 0.5074225
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1975,
+        "function": "_consolidate_inplace",
+        "primitive_calls": 12179,
+        "calls": 12179,
+        "self_seconds": 0.040082400000000004,
+        "cumulative_seconds": 0.49745510000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\common.py",
+        "line": 1821,
+        "function": "pandas_dtype",
+        "primitive_calls": 199338,
+        "calls": 199338,
+        "self_seconds": 0.1603456,
+        "cumulative_seconds": 0.4928924
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 13704,
+        "function": "any",
+        "primitive_calls": 3225,
+        "calls": 3225,
+        "self_seconds": 0.0046036,
+        "cumulative_seconds": 0.49088580000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1430,
+        "function": "_iset_split_block",
+        "primitive_calls": 38082,
+        "calls": 38082,
+        "self_seconds": 0.11542490000000001,
+        "cumulative_seconds": 0.4861732
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\construction.py",
+        "line": 375,
+        "function": "dict_to_mgr",
+        "primitive_calls": 1567,
+        "calls": 1567,
+        "self_seconds": 0.025087,
+        "cumulative_seconds": 0.48447320000000005
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 11569,
+        "function": "_logical_func",
+        "primitive_calls": 3225,
+        "calls": 3225,
+        "self_seconds": 0.0098942,
+        "cumulative_seconds": 0.47866430000000004
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method builtins.len>",
+        "primitive_calls": 1417058,
+        "calls": 2301627,
+        "self_seconds": 0.3346483,
+        "cumulative_seconds": 0.4778755
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 13538,
+        "function": "_reduce",
+        "primitive_calls": 3225,
+        "calls": 3225,
+        "self_seconds": 0.0182549,
+        "cumulative_seconds": 0.46648940000000005
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 294,
+        "function": "close_market",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0032433,
+        "cumulative_seconds": 0.46335740000000003
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6119,
+        "function": "__finalize__",
+        "primitive_calls": 165894,
+        "calls": 165894,
+        "self_seconds": 0.3121103,
+        "cumulative_seconds": 0.4559898
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1226,
+        "function": "iget",
+        "primitive_calls": 81863,
+        "calls": 81863,
+        "self_seconds": 0.20822510000000002,
+        "cumulative_seconds": 0.45253210000000005
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 1550,
+        "function": "_get_listlike_indexer",
+        "primitive_calls": 1563,
+        "calls": 1563,
+        "self_seconds": 0.0018142000000000002,
+        "cumulative_seconds": 0.4150324
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 5732,
+        "function": "_sanitize_column",
+        "primitive_calls": 47284,
+        "calls": 47284,
+        "self_seconds": 0.0465606,
+        "cumulative_seconds": 0.4134396
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 5127,
+        "function": "_get_engine_target",
+        "primitive_calls": 12518,
+        "calls": 12518,
+        "self_seconds": 0.0255669,
+        "cumulative_seconds": 0.4091598
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 6829,
+        "function": "_maybe_cast_listlike_indexer",
+        "primitive_calls": 9098,
+        "calls": 9098,
+        "self_seconds": 0.0060416,
+        "cumulative_seconds": 0.4015059
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6196,
+        "function": "__setattr__",
+        "primitive_calls": 241791,
+        "calls": 241839,
+        "self_seconds": 0.18353960000000002,
+        "cumulative_seconds": 0.38819620000000005
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 778,
+        "function": "__getitem__",
+        "primitive_calls": 88914,
+        "calls": 88914,
+        "self_seconds": 0.22690210000000002,
+        "cumulative_seconds": 0.3709749
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2470,
+        "function": "_consolidate",
+        "primitive_calls": 7475,
+        "calls": 7475,
+        "self_seconds": 0.0247817,
+        "cumulative_seconds": 0.3702347
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\portfolio_optimizer.py",
+        "line": 13,
+        "function": "optimize",
+        "primitive_calls": 49,
+        "calls": 49,
+        "self_seconds": 0.0011422000000000001,
+        "cumulative_seconds": 0.3701645
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 5384,
+        "function": "__getitem__",
+        "primitive_calls": 81921,
+        "calls": 81921,
+        "self_seconds": 0.0661304,
+        "cumulative_seconds": 0.3614798
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 1033,
+        "function": "view",
+        "primitive_calls": 155481,
+        "calls": 155481,
+        "self_seconds": 0.07243580000000001,
+        "cumulative_seconds": 0.35987210000000003
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\base.py",
+        "line": 996,
+        "function": "_map_values",
+        "primitive_calls": 46785,
+        "calls": 46785,
+        "self_seconds": 0.0324424,
+        "cumulative_seconds": 0.34573230000000005
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 813,
+        "function": "reindex_indexer",
+        "primitive_calls": 4901,
+        "calls": 4901,
+        "self_seconds": 0.0180938,
+        "cumulative_seconds": 0.3345576
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 3798,
+        "function": "_get_indexer",
+        "primitive_calls": 7921,
+        "calls": 7921,
+        "self_seconds": 0.0362754,
+        "cumulative_seconds": 0.3287396
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 3998,
+        "function": "take",
+        "primitive_calls": 3327,
+        "calls": 3327,
+        "self_seconds": 0.0098702,
+        "cumulative_seconds": 0.32091240000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\string_arrow.py",
+        "line": 325,
+        "function": "astype",
+        "primitive_calls": 10952,
+        "calls": 10952,
+        "self_seconds": 0.033128200000000003,
+        "cumulative_seconds": 0.31567880000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 1541,
+        "function": "delete",
+        "primitive_calls": 38082,
+        "calls": 38082,
+        "self_seconds": 0.2033657,
+        "cumulative_seconds": 0.31326210000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1065,
+        "function": "take",
+        "primitive_calls": 3329,
+        "calls": 3329,
+        "self_seconds": 0.006269500000000001,
+        "cumulative_seconds": 0.2978817
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\threading.py",
+        "line": 327,
+        "function": "wait",
+        "primitive_calls": 7,
+        "calls": 223,
+        "self_seconds": 0.010428300000000001,
+        "cumulative_seconds": 0.2968537
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\schemas.py",
+        "line": 49,
+        "function": "empty_result",
+        "primitive_calls": 782,
+        "calls": 782,
+        "self_seconds": 0.0008789000000000001,
+        "cumulative_seconds": 0.2941068
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6348,
+        "function": "astype",
+        "primitive_calls": 3227,
+        "calls": 3227,
+        "self_seconds": 0.0076004,
+        "cumulative_seconds": 0.28559500000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2053,
+        "function": "from_array",
+        "primitive_calls": 61614,
+        "calls": 61614,
+        "self_seconds": 0.0912184,
+        "cumulative_seconds": 0.28479930000000003
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 217,
+        "function": "_ensure_loaded",
+        "primitive_calls": 586,
+        "calls": 586,
+        "self_seconds": 0.0170771,
+        "cumulative_seconds": 0.2794356
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\algorithms.py",
+        "line": 1637,
+        "function": "map_array",
+        "primitive_calls": 46785,
+        "calls": 46785,
+        "self_seconds": 0.0764322,
+        "cumulative_seconds": 0.2776668
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 1228,
+        "function": "take",
+        "primitive_calls": 8116,
+        "calls": 8116,
+        "self_seconds": 0.0339712,
+        "cumulative_seconds": 0.2764938
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 900,
+        "function": "_slice_take_blocks_ax0",
+        "primitive_calls": 22596,
+        "calls": 22596,
+        "self_seconds": 0.08121070000000001,
+        "cumulative_seconds": 0.2755077
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\generic.py",
+        "line": 43,
+        "function": "_instancecheck",
+        "primitive_calls": 588875,
+        "calls": 588875,
+        "self_seconds": 0.1155415,
+        "cumulative_seconds": 0.26850050000000003
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\string_arrow.py",
+        "line": 195,
+        "function": "_from_sequence",
+        "primitive_calls": 13951,
+        "calls": 13951,
+        "self_seconds": 0.1505534,
+        "cumulative_seconds": 0.2626247
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\concurrent\\futures\\_base.py",
+        "line": 428,
+        "function": "result",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 3.21e-05,
+        "cumulative_seconds": 0.2576565
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\concurrent\\futures\\thread.py",
+        "line": 54,
+        "function": "run",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 0.0005636,
+        "cumulative_seconds": 0.2541125
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 639,
+        "function": "copy",
+        "primitive_calls": 68381,
+        "calls": 68381,
+        "self_seconds": 0.0553656,
+        "cumulative_seconds": 0.2473836
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 686,
+        "function": "_constructor_sliced_from_mgr",
+        "primitive_calls": 85089,
+        "calls": 85089,
+        "self_seconds": 0.050889500000000004,
+        "cumulative_seconds": 0.2470081
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 7965,
+        "function": "duplicated",
+        "primitive_calls": 3225,
+        "calls": 3225,
+        "self_seconds": 0.009788400000000001,
+        "cumulative_seconds": 0.2429881
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1625,
+        "function": "take",
+        "primitive_calls": 7464,
+        "calls": 7464,
+        "self_seconds": 0.0282039,
+        "cumulative_seconds": 0.24040740000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 875,
+        "function": "__iter__",
+        "primitive_calls": 234104,
+        "calls": 234104,
+        "self_seconds": 0.23334080000000001,
+        "cumulative_seconds": 0.23950680000000002
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method builtins.all>",
+        "primitive_calls": 181387,
+        "calls": 181393,
+        "self_seconds": 0.07685550000000001,
+        "cumulative_seconds": 0.22492520000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 5446,
+        "function": "_can_hold_identifiers_and_holds_name",
+        "primitive_calls": 30340,
+        "calls": 30340,
+        "self_seconds": 0.023951800000000002,
+        "cumulative_seconds": 0.2228745
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2487,
+        "function": "_merge_blocks",
+        "primitive_calls": 9723,
+        "calls": 9723,
+        "self_seconds": 0.094236,
+        "cumulative_seconds": 0.2218198
+      }
+    ],
+    "by_self": [
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method builtins.isinstance>",
+        "primitive_calls": 8081459,
+        "calls": 8087959,
+        "self_seconds": 0.7335952,
+        "cumulative_seconds": 1.0237302000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1280,
+        "function": "iset",
+        "primitive_calls": 46786,
+        "calls": 46786,
+        "self_seconds": 0.45308940000000003,
+        "cumulative_seconds": 1.3774803
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\construction.py",
+        "line": 531,
+        "function": "sanitize_array",
+        "primitive_calls": 90621,
+        "calls": 90621,
+        "self_seconds": 0.44074040000000003,
+        "cumulative_seconds": 1.390814
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method builtins.len>",
+        "primitive_calls": 1417058,
+        "calls": 2301627,
+        "self_seconds": 0.3346483,
+        "cumulative_seconds": 0.4778755
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6119,
+        "function": "__finalize__",
+        "primitive_calls": 165894,
+        "calls": 165894,
+        "self_seconds": 0.3121103,
+        "cumulative_seconds": 0.4559898
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\series.py",
+        "line": 369,
+        "function": "__init__",
+        "primitive_calls": 61669,
+        "calls": 61669,
+        "self_seconds": 0.2384069,
+        "cumulative_seconds": 2.0418899
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 875,
+        "function": "__iter__",
+        "primitive_calls": 234104,
+        "calls": 234104,
+        "self_seconds": 0.23334080000000001,
+        "cumulative_seconds": 0.23950680000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 83,
+        "function": "_clone",
+        "primitive_calls": 4464,
+        "calls": 129551,
+        "self_seconds": 0.23178580000000001,
+        "cumulative_seconds": 7.0584633000000006
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 778,
+        "function": "__getitem__",
+        "primitive_calls": 88914,
+        "calls": 88914,
+        "self_seconds": 0.22690210000000002,
+        "cumulative_seconds": 0.3709749
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1226,
+        "function": "iget",
+        "primitive_calls": 81863,
+        "calls": 81863,
+        "self_seconds": 0.20822510000000002,
+        "cumulative_seconds": 0.45253210000000005
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 1541,
+        "function": "delete",
+        "primitive_calls": 38082,
+        "calls": 38082,
+        "self_seconds": 0.2033657,
+        "cumulative_seconds": 0.31326210000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6196,
+        "function": "__setattr__",
+        "primitive_calls": 241791,
+        "calls": 241839,
+        "self_seconds": 0.18353960000000002,
+        "cumulative_seconds": 0.38819620000000005
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\common.py",
+        "line": 1821,
+        "function": "pandas_dtype",
+        "primitive_calls": 199338,
+        "calls": 199338,
+        "self_seconds": 0.1603456,
+        "cumulative_seconds": 0.4928924
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4337,
+        "function": "__getitem__",
+        "primitive_calls": 83669,
+        "calls": 83669,
+        "self_seconds": 0.15274590000000002,
+        "cumulative_seconds": 3.2506542
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\string_arrow.py",
+        "line": 195,
+        "function": "_from_sequence",
+        "primitive_calls": 13951,
+        "calls": 13951,
+        "self_seconds": 0.1505534,
+        "cumulative_seconds": 0.2626247
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 258,
+        "function": "__init__",
+        "primitive_calls": 177733,
+        "calls": 177733,
+        "self_seconds": 0.1419226,
+        "cumulative_seconds": 0.1902687
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pyarrow\\compute.py",
+        "line": 467,
+        "function": "take",
+        "primitive_calls": 7464,
+        "calls": 7464,
+        "self_seconds": 0.139237,
+        "cumulative_seconds": 0.1414477
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<method 'copy' of 'numpy.ndarray' objects>",
+        "primitive_calls": 166097,
+        "calls": 166097,
+        "self_seconds": 0.135723,
+        "cumulative_seconds": 0.135723
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method builtins.getattr>",
+        "primitive_calls": 1146985,
+        "calls": 1146985,
+        "self_seconds": 0.115912,
+        "cumulative_seconds": 0.1175881
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\generic.py",
+        "line": 43,
+        "function": "_instancecheck",
+        "primitive_calls": 588875,
+        "calls": 588875,
+        "self_seconds": 0.1155415,
+        "cumulative_seconds": 0.26850050000000003
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1430,
+        "function": "_iset_split_block",
+        "primitive_calls": 38082,
+        "calls": 38082,
+        "self_seconds": 0.11542490000000001,
+        "cumulative_seconds": 0.4861732
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4559,
+        "function": "__setitem__",
+        "primitive_calls": 47282,
+        "calls": 47282,
+        "self_seconds": 0.10931080000000001,
+        "cumulative_seconds": 2.3067482000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\generic.py",
+        "line": 38,
+        "function": "_check",
+        "primitive_calls": 588875,
+        "calls": 588875,
+        "self_seconds": 0.1058289,
+        "cumulative_seconds": 0.1524455
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 399,
+        "function": "apply",
+        "primitive_calls": 20332,
+        "calls": 20332,
+        "self_seconds": 0.094485,
+        "cumulative_seconds": 0.6326667
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2487,
+        "function": "_merge_blocks",
+        "primitive_calls": 9723,
+        "calls": 9723,
+        "self_seconds": 0.094236,
+        "cumulative_seconds": 0.2218198
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+        "primitive_calls": 95741,
+        "calls": 95741,
+        "self_seconds": 0.0922396,
+        "cumulative_seconds": 0.0922396
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2053,
+        "function": "from_array",
+        "primitive_calls": 61614,
+        "calls": 61614,
+        "self_seconds": 0.0912184,
+        "cumulative_seconds": 0.28479930000000003
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\series.py",
+        "line": 4506,
+        "function": "map",
+        "primitive_calls": 46783,
+        "calls": 46783,
+        "self_seconds": 0.0878879,
+        "cumulative_seconds": 1.9822154
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\range.py",
+        "line": 630,
+        "function": "_view",
+        "primitive_calls": 117464,
+        "calls": 117464,
+        "self_seconds": 0.0867324,
+        "cumulative_seconds": 0.1972314
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 3601,
+        "function": "get_loc",
+        "primitive_calls": 139124,
+        "calls": 139124,
+        "self_seconds": 0.0840202,
+        "cumulative_seconds": 0.161284
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 2195,
+        "function": "maybe_coerce_values",
+        "primitive_calls": 123431,
+        "calls": 123431,
+        "self_seconds": 0.0834228,
+        "cumulative_seconds": 0.1553854
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 5334,
+        "function": "__contains__",
+        "primitive_calls": 158041,
+        "calls": 158041,
+        "self_seconds": 0.0818184,
+        "cumulative_seconds": 0.1217854
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\numpy\\_core\\numeric.py",
+        "line": 323,
+        "function": "full",
+        "primitive_calls": 73927,
+        "calls": 73927,
+        "self_seconds": 0.0816041,
+        "cumulative_seconds": 0.1441161
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 900,
+        "function": "_slice_take_blocks_ax0",
+        "primitive_calls": 22596,
+        "calls": 22596,
+        "self_seconds": 0.08121070000000001,
+        "cumulative_seconds": 0.2755077
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\string_arrow.py",
+        "line": 134,
+        "function": "__init__",
+        "primitive_calls": 33185,
+        "calls": 33185,
+        "self_seconds": 0.0805093,
+        "cumulative_seconds": 0.18615150000000003
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 486,
+        "function": "__new__",
+        "primitive_calls": 14417,
+        "calls": 14417,
+        "self_seconds": 0.07854570000000001,
+        "cumulative_seconds": 0.8571611
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4956,
+        "function": "_box_col_values",
+        "primitive_calls": 81863,
+        "calls": 81863,
+        "self_seconds": 0.07821360000000001,
+        "cumulative_seconds": 0.8974991000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\common.py",
+        "line": 1659,
+        "function": "_is_dtype_type",
+        "primitive_calls": 80449,
+        "calls": 80449,
+        "self_seconds": 0.0780087,
+        "cumulative_seconds": 0.1643677
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method builtins.all>",
+        "primitive_calls": 181387,
+        "calls": 181393,
+        "self_seconds": 0.07685550000000001,
+        "cumulative_seconds": 0.22492520000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\algorithms.py",
+        "line": 1637,
+        "function": "map_array",
+        "primitive_calls": 46785,
+        "calls": 46785,
+        "self_seconds": 0.0764322,
+        "cumulative_seconds": 0.2776668
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\inference.py",
+        "line": 387,
+        "function": "is_hashable",
+        "primitive_calls": 269082,
+        "calls": 269082,
+        "self_seconds": 0.0726889,
+        "cumulative_seconds": 0.1140237
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 1033,
+        "function": "view",
+        "primitive_calls": 155481,
+        "calls": 155481,
+        "self_seconds": 0.07243580000000001,
+        "cumulative_seconds": 0.35987210000000003
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\range.py",
+        "line": 240,
+        "function": "_simple_new",
+        "primitive_calls": 126785,
+        "calls": 126785,
+        "self_seconds": 0.0713969,
+        "cumulative_seconds": 0.11837500000000001
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method builtins.hasattr>",
+        "primitive_calls": 631814,
+        "calls": 631814,
+        "self_seconds": 0.06907880000000001,
+        "cumulative_seconds": 0.07019170000000001
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\copy.py",
+        "line": 119,
+        "function": "deepcopy",
+        "primitive_calls": 144392,
+        "calls": 144495,
+        "self_seconds": 0.0687975,
+        "cumulative_seconds": 0.10766410000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 5384,
+        "function": "__getitem__",
+        "primitive_calls": 81921,
+        "calls": 81921,
+        "self_seconds": 0.0661304,
+        "cumulative_seconds": 0.3614798
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\inference.py",
+        "line": 306,
+        "function": "is_dict_like",
+        "primitive_calls": 97300,
+        "calls": 97300,
+        "self_seconds": 0.063474,
+        "cumulative_seconds": 0.1746389
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 652,
+        "function": "_simple_new",
+        "primitive_calls": 61892,
+        "calls": 61892,
+        "self_seconds": 0.0625222,
+        "cumulative_seconds": 0.0905124
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1757,
+        "function": "to_numpy",
+        "primitive_calls": 11335,
+        "calls": 11335,
+        "self_seconds": 0.062174700000000006,
+        "cumulative_seconds": 0.0977916
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4864,
+        "function": "_set_item",
+        "primitive_calls": 47282,
+        "calls": 47282,
+        "self_seconds": 0.0612578,
+        "cumulative_seconds": 2.14032
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 2204,
+        "function": "internal_values",
+        "primitive_calls": 224086,
+        "calls": 224086,
+        "self_seconds": 0.0588774,
+        "cumulative_seconds": 0.0721736
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\range.py",
+        "line": 1276,
+        "function": "__len__",
+        "primitive_calls": 413761,
+        "calls": 413761,
+        "self_seconds": 0.057926200000000004,
+        "cumulative_seconds": 0.08855840000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 215,
+        "function": "shape",
+        "primitive_calls": 65650,
+        "calls": 65650,
+        "self_seconds": 0.0576918,
+        "cumulative_seconds": 0.1753425
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 639,
+        "function": "copy",
+        "primitive_calls": 68381,
+        "calls": 68381,
+        "self_seconds": 0.0553656,
+        "cumulative_seconds": 0.2473836
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\base.py",
+        "line": 563,
+        "function": "find",
+        "primitive_calls": 40723,
+        "calls": 40723,
+        "self_seconds": 0.0553287,
+        "cumulative_seconds": 0.1451663
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 2224,
+        "function": "get_block_type",
+        "primitive_calls": 132440,
+        "calls": 132440,
+        "self_seconds": 0.0549064,
+        "cumulative_seconds": 0.08261750000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6179,
+        "function": "__getattr__",
+        "primitive_calls": 92009,
+        "calls": 92009,
+        "self_seconds": 0.052590700000000004,
+        "cumulative_seconds": 0.8751412000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 2266,
+        "function": "new_block",
+        "primitive_calls": 74831,
+        "calls": 74831,
+        "self_seconds": 0.051963300000000004,
+        "cumulative_seconds": 0.0976077
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\string_.py",
+        "line": 235,
+        "function": "__eq__",
+        "primitive_calls": 136844,
+        "calls": 136844,
+        "self_seconds": 0.0517002,
+        "cumulative_seconds": 0.0762467
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 686,
+        "function": "_constructor_sliced_from_mgr",
+        "primitive_calls": 85089,
+        "calls": 85089,
+        "self_seconds": 0.050889500000000004,
+        "cumulative_seconds": 0.2470081
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\base.py",
+        "line": 931,
+        "function": "__iter__",
+        "primitive_calls": 56354,
+        "calls": 56354,
+        "self_seconds": 0.050053600000000004,
+        "cumulative_seconds": 0.1087704
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 2253,
+        "function": "new_block_2d",
+        "primitive_calls": 55052,
+        "calls": 55052,
+        "self_seconds": 0.049739500000000006,
+        "cumulative_seconds": 0.1555399
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\dtypes\\inference.py",
+        "line": 343,
+        "function": "<genexpr>",
+        "primitive_calls": 292007,
+        "calls": 292007,
+        "self_seconds": 0.0487167,
+        "cumulative_seconds": 0.0704319
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\flags.py",
+        "line": 63,
+        "function": "__init__",
+        "primitive_calls": 177733,
+        "calls": 177733,
+        "self_seconds": 0.0483461,
+        "cumulative_seconds": 0.0483461
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pyarrow\\parquet\\core.py",
+        "line": 1525,
+        "function": "read",
+        "primitive_calls": 48,
+        "calls": 48,
+        "self_seconds": 0.048172200000000005,
+        "cumulative_seconds": 0.049093300000000006
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 294,
+        "function": "_from_mgr",
+        "primitive_calls": 114251,
+        "calls": 114251,
+        "self_seconds": 0.0474904,
+        "cumulative_seconds": 0.1849134
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method numpy.asarray>",
+        "primitive_calls": 109226,
+        "calls": 109276,
+        "self_seconds": 0.0473823,
+        "cumulative_seconds": 0.0484293
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4292,
+        "function": "_ixs",
+        "primitive_calls": 85089,
+        "calls": 85089,
+        "self_seconds": 0.0471448,
+        "cumulative_seconds": 1.4487322
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 5732,
+        "function": "_sanitize_column",
+        "primitive_calls": 47284,
+        "calls": 47284,
+        "self_seconds": 0.0465606,
+        "cumulative_seconds": 0.4134396
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\construction.py",
+        "line": 495,
+        "function": "ensure_wrapped_if_datetimelike",
+        "primitive_calls": 162834,
+        "calls": 162834,
+        "self_seconds": 0.0465573,
+        "cumulative_seconds": 0.0562461
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method builtins.hash>",
+        "primitive_calls": 427128,
+        "calls": 427128,
+        "self_seconds": 0.0458546,
+        "cumulative_seconds": 0.0458546
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method __new__ of type object at 0x00007FFC8B0618A0>",
+        "primitive_calls": 309231,
+        "calls": 309242,
+        "self_seconds": 0.0458317,
+        "cumulative_seconds": 0.045980700000000006
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\series.py",
+        "line": 789,
+        "function": "_values",
+        "primitive_calls": 224086,
+        "calls": 224086,
+        "self_seconds": 0.045524600000000005,
+        "cumulative_seconds": 0.1176982
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4838,
+        "function": "_iset_item_mgr",
+        "primitive_calls": 46786,
+        "calls": 46786,
+        "self_seconds": 0.0440477,
+        "cumulative_seconds": 1.4215280000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\array_algos\\take.py",
+        "line": 118,
+        "function": "_take_nd_ndarray",
+        "primitive_calls": 9911,
+        "calls": 9911,
+        "self_seconds": 0.043856200000000005,
+        "cumulative_seconds": 0.0691823
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 366,
+        "function": "__init__",
+        "primitive_calls": 33625,
+        "calls": 33625,
+        "self_seconds": 0.0438435,
+        "cumulative_seconds": 0.0738553
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\series.py",
+        "line": 741,
+        "function": "name",
+        "primitive_calls": 66806,
+        "calls": 66806,
+        "self_seconds": 0.043489700000000006,
+        "cumulative_seconds": 0.14243740000000002
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method numpy.arange>",
+        "primitive_calls": 77884,
+        "calls": 77884,
+        "self_seconds": 0.043292000000000004,
+        "cumulative_seconds": 0.043292000000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\numpy\\_core\\fromnumeric.py",
+        "line": 66,
+        "function": "_wrapreduction",
+        "primitive_calls": 38246,
+        "calls": 38246,
+        "self_seconds": 0.0421954,
+        "cumulative_seconds": 0.07596520000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\common.py",
+        "line": 377,
+        "function": "apply_if_callable",
+        "primitive_calls": 141731,
+        "calls": 141780,
+        "self_seconds": 0.041917100000000006,
+        "cumulative_seconds": 0.0701832
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\flags.py",
+        "line": 99,
+        "function": "allows_duplicate_labels",
+        "primitive_calls": 164326,
+        "calls": 164326,
+        "self_seconds": 0.041873400000000005,
+        "cumulative_seconds": 0.041873400000000005
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexing.py",
+        "line": 2780,
+        "function": "check_dict_or_set_indexers",
+        "primitive_calls": 90827,
+        "calls": 90827,
+        "self_seconds": 0.0412833,
+        "cumulative_seconds": 0.07321040000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4968,
+        "function": "_get_item",
+        "primitive_calls": 80436,
+        "calls": 80436,
+        "self_seconds": 0.0409168,
+        "cumulative_seconds": 1.4585290000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 7919,
+        "function": "ensure_index",
+        "primitive_calls": 146149,
+        "calls": 146149,
+        "self_seconds": 0.0406207,
+        "cumulative_seconds": 0.8813027000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\construction.py",
+        "line": 718,
+        "function": "_sanitize_ndim",
+        "primitive_calls": 87248,
+        "calls": 87248,
+        "self_seconds": 0.0403034,
+        "cumulative_seconds": 0.081364
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 16702,
+        "function": "_reindex_for_setitem",
+        "primitive_calls": 46792,
+        "calls": 46792,
+        "self_seconds": 0.0402865,
+        "cumulative_seconds": 0.0959401
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 1975,
+        "function": "_consolidate_inplace",
+        "primitive_calls": 12179,
+        "calls": 12179,
+        "self_seconds": 0.040082400000000004,
+        "cumulative_seconds": 0.49745510000000004
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<method 'append' of 'list' objects>",
+        "primitive_calls": 325280,
+        "calls": 325280,
+        "self_seconds": 0.0387436,
+        "cumulative_seconds": 0.0387436
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\frame.py",
+        "line": 4933,
+        "function": "_ensure_valid_index",
+        "primitive_calls": 47284,
+        "calls": 47284,
+        "self_seconds": 0.0380587,
+        "cumulative_seconds": 0.1270056
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\numpy\\_core\\shape_base.py",
+        "line": 218,
+        "function": "vstack",
+        "primitive_calls": 7768,
+        "calls": 7768,
+        "self_seconds": 0.037930700000000005,
+        "cumulative_seconds": 0.0627289
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 2344,
+        "function": "extend_blocks",
+        "primitive_calls": 82415,
+        "calls": 82415,
+        "self_seconds": 0.0374151,
+        "cumulative_seconds": 0.060607400000000006
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 360,
+        "function": "flags",
+        "primitive_calls": 494068,
+        "calls": 494068,
+        "self_seconds": 0.0373257,
+        "cumulative_seconds": 0.0373257
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 179,
+        "function": "_consolidate_key",
+        "primitive_calls": 38812,
+        "calls": 38812,
+        "self_seconds": 0.0366796,
+        "cumulative_seconds": 0.08741840000000001
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method numpy.empty>",
+        "primitive_calls": 100182,
+        "calls": 100182,
+        "self_seconds": 0.036520300000000006,
+        "cumulative_seconds": 0.036520300000000006
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<built-in method builtins.issubclass>",
+        "primitive_calls": 415868,
+        "calls": 415868,
+        "self_seconds": 0.0364856,
+        "cumulative_seconds": 0.0364868
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\string_.py",
+        "line": 196,
+        "function": "__init__",
+        "primitive_calls": 13523,
+        "calls": 13523,
+        "self_seconds": 0.036398400000000004,
+        "cumulative_seconds": 0.09577190000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 3798,
+        "function": "_get_indexer",
+        "primitive_calls": 7921,
+        "calls": 7921,
+        "self_seconds": 0.0362754,
+        "cumulative_seconds": 0.3287396
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexers\\utils.py",
+        "line": 441,
+        "function": "check_array_indexer",
+        "primitive_calls": 93632,
+        "calls": 93632,
+        "self_seconds": 0.0352402,
+        "cumulative_seconds": 0.0369388
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1533,
+        "function": "factorize",
+        "primitive_calls": 699,
+        "calls": 699,
+        "self_seconds": 0.0349203,
+        "cumulative_seconds": 0.0411764
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\threading.py",
+        "line": 1059,
+        "function": "join",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 0.0347422,
+        "cumulative_seconds": 13.4478846
+      }
+    ],
+    "project": [
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 495,
+        "function": "history",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 7.3e-06,
+        "cumulative_seconds": 0.0031485000000000003
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 121,
+        "function": "read_dates",
+        "primitive_calls": 12,
+        "calls": 12,
+        "self_seconds": 0.000174,
+        "cumulative_seconds": 0.0410567
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 264,
+        "function": "as_of",
+        "primitive_calls": 49,
+        "calls": 49,
+        "self_seconds": 0.0007303,
+        "cumulative_seconds": 0.15455950000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\corporate_actions.py",
+        "line": 15,
+        "function": "apply",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0034507,
+        "cumulative_seconds": 3.0287587
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 332,
+        "function": "_validate",
+        "primitive_calls": 1909,
+        "calls": 1909,
+        "self_seconds": 0.026823100000000002,
+        "cumulative_seconds": 3.6448839000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\engine.py",
+        "line": 78,
+        "function": "run",
+        "primitive_calls": 1,
+        "calls": 2,
+        "self_seconds": 0.0003902,
+        "cumulative_seconds": 13.6272514
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 213,
+        "function": "finish_day",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0112563,
+        "cumulative_seconds": 0.0119279
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 271,
+        "function": "_publish",
+        "primitive_calls": 1909,
+        "calls": 1909,
+        "self_seconds": 0.0093825,
+        "cumulative_seconds": 7.3632425
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 95,
+        "function": "prepare",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 1.7500000000000002e-05,
+        "cumulative_seconds": 0.0015656
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 168,
+        "function": "_read_batch",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 0.0022236,
+        "cumulative_seconds": 0.11271310000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 217,
+        "function": "_ensure_loaded",
+        "primitive_calls": 586,
+        "calls": 586,
+        "self_seconds": 0.0170771,
+        "cumulative_seconds": 0.2794356
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\broker.py",
+        "line": 21,
+        "function": "execute",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0021362,
+        "cumulative_seconds": 2.5248325
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 83,
+        "function": "_clone",
+        "primitive_calls": 4464,
+        "calls": 129551,
+        "self_seconds": 0.23178580000000001,
+        "cumulative_seconds": 7.0584633000000006
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 32,
+        "function": "_price_history",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 0.003415,
+        "cumulative_seconds": 0.0686646
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 119,
+        "function": "__init__",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 2.02e-05,
+        "cumulative_seconds": 0.0052908
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 177,
+        "function": "advance",
+        "primitive_calls": 1028,
+        "calls": 1028,
+        "self_seconds": 0.0033928,
+        "cumulative_seconds": 0.0066189000000000005
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 519,
+        "function": "result_tables",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 4.1500000000000006e-05,
+        "cumulative_seconds": 0.0832354
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 245,
+        "function": "_read_allowed",
+        "primitive_calls": 2544,
+        "calls": 2544,
+        "self_seconds": 0.0026193,
+        "cumulative_seconds": 0.0038454
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\config.py",
+        "line": 123,
+        "function": "validate_capabilities",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 2.4000000000000003e-06,
+        "cumulative_seconds": 3.1000000000000004e-06
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 281,
+        "function": "open_market",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0031932,
+        "cumulative_seconds": 0.7074576
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 294,
+        "function": "close_market",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0032433,
+        "cumulative_seconds": 0.46335740000000003
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 230,
+        "function": "close",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 2.4900000000000002e-05,
+        "cumulative_seconds": 0.020200100000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\accounting.py",
+        "line": 22,
+        "function": "mark_to_market",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0042141,
+        "cumulative_seconds": 3.1937870000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\result_writer.py",
+        "line": 18,
+        "function": "open",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 7.6e-06,
+        "cumulative_seconds": 0.0005665000000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 308,
+        "function": "playback",
+        "primitive_calls": 245,
+        "calls": 245,
+        "self_seconds": 0.0012958000000000002,
+        "cumulative_seconds": 14.7907422
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 100,
+        "function": "_frame",
+        "primitive_calls": 4445,
+        "calls": 4445,
+        "self_seconds": 0.031428700000000004,
+        "cumulative_seconds": 2.6853193
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 543,
+        "function": "log",
+        "primitive_calls": 3379,
+        "calls": 3379,
+        "self_seconds": 0.0100534,
+        "cumulative_seconds": 0.048080500000000005
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\portfolio_optimizer.py",
+        "line": 13,
+        "function": "optimize",
+        "primitive_calls": 49,
+        "calls": 49,
+        "self_seconds": 0.0011422000000000001,
+        "cumulative_seconds": 0.3701645
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 317,
+        "function": "_account",
+        "primitive_calls": 1220,
+        "calls": 1220,
+        "self_seconds": 0.0029731000000000002,
+        "cumulative_seconds": 0.9256839
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\submission_runner.py",
+        "line": 20,
+        "function": "predict",
+        "primitive_calls": 49,
+        "calls": 49,
+        "self_seconds": 0.0049651,
+        "cumulative_seconds": 0.2125216
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\config.py",
+        "line": 92,
+        "function": "__post_init__",
+        "primitive_calls": 2,
+        "calls": 2,
+        "self_seconds": 1.3300000000000001e-05,
+        "cumulative_seconds": 2.64e-05
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\contracts.py",
+        "line": 74,
+        "function": "__post_init__",
+        "primitive_calls": 2052,
+        "calls": 2052,
+        "self_seconds": 0.0007901000000000001,
+        "cumulative_seconds": 0.0009303
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\result_writer.py",
+        "line": 33,
+        "function": "flush_log",
+        "primitive_calls": 246,
+        "calls": 246,
+        "self_seconds": 0.00039900000000000005,
+        "cumulative_seconds": 0.0837281
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 152,
+        "function": "_check",
+        "primitive_calls": 9364,
+        "calls": 9364,
+        "self_seconds": 0.0036594,
+        "cumulative_seconds": 0.0051276
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 326,
+        "function": "_dataset",
+        "primitive_calls": 147,
+        "calls": 147,
+        "self_seconds": 7.05e-05,
+        "cumulative_seconds": 0.0659866
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 81,
+        "function": "close",
+        "primitive_calls": 3,
+        "calls": 3,
+        "self_seconds": 0.0017433000000000001,
+        "cumulative_seconds": 13.4496754
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 142,
+        "function": "<genexpr>",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 3.9e-06,
+        "cumulative_seconds": 3.9e-06
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\engine.py",
+        "line": 183,
+        "function": "<lambda>",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 2.6e-06,
+        "cumulative_seconds": 0.000326
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\prediction_evaluator.py",
+        "line": 9,
+        "function": "evaluate",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 2.0700000000000002e-05,
+        "cumulative_seconds": 0.0175873
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 162,
+        "function": "_key_for",
+        "primitive_calls": 4697,
+        "calls": 4697,
+        "self_seconds": 0.001312,
+        "cumulative_seconds": 0.001312
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 482,
+        "function": "contains",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0003444,
+        "cumulative_seconds": 0.0009763
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\label_provider.py",
+        "line": 15,
+        "function": "build",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 4.1000000000000006e-06,
+        "cumulative_seconds": 0.0025093000000000003
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\metrics.py",
+        "line": 13,
+        "function": "calculate",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 1.8000000000000001e-06,
+        "cumulative_seconds": 5.97e-05
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\contracts.py",
+        "line": 126,
+        "function": "from_dates",
+        "primitive_calls": 2,
+        "calls": 2,
+        "self_seconds": 1.1000000000000001e-05,
+        "cumulative_seconds": 0.0005279
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 254,
+        "function": "_slice",
+        "primitive_calls": 684,
+        "calls": 684,
+        "self_seconds": 0.0057332,
+        "cumulative_seconds": 0.6575247000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\reference_data.py",
+        "line": 12,
+        "function": "_external",
+        "primitive_calls": 342,
+        "calls": 342,
+        "self_seconds": 0.00040550000000000004,
+        "cumulative_seconds": 0.0010398
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\contracts.py",
+        "line": 96,
+        "function": "price_mode",
+        "primitive_calls": 1222,
+        "calls": 1222,
+        "self_seconds": 0.0001822,
+        "cumulative_seconds": 0.0001822
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\contracts.py",
+        "line": 100,
+        "function": "benchmark_mode",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 3.0000000000000004e-07,
+        "cumulative_seconds": 3.0000000000000004e-07
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\contracts.py",
+        "line": 92,
+        "function": "initial_cash",
+        "primitive_calls": 2,
+        "calls": 2,
+        "self_seconds": 4.0000000000000003e-07,
+        "cumulative_seconds": 4.0000000000000003e-07
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\contracts.py",
+        "line": 104,
+        "function": "label_price_basis",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 9.000000000000001e-07,
+        "cumulative_seconds": 9.000000000000001e-07
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\accounting.py",
+        "line": 15,
+        "function": "mark_at_open",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0012115000000000001,
+        "cumulative_seconds": 1.1900005
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 554,
+        "function": "log_records",
+        "primitive_calls": 246,
+        "calls": 246,
+        "self_seconds": 0.0003234,
+        "cumulative_seconds": 0.0833291
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 487,
+        "function": "read",
+        "primitive_calls": 2300,
+        "calls": 2300,
+        "self_seconds": 0.0031854,
+        "cumulative_seconds": 3.7180562000000004
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\broker.py",
+        "line": 16,
+        "function": "start_day",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0019825000000000003,
+        "cumulative_seconds": 1.0595096000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\reference_data.py",
+        "line": 20,
+        "function": "prepare_close",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.0003591,
+        "cumulative_seconds": 0.007097600000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 170,
+        "function": "_complete_phase",
+        "primitive_calls": 1028,
+        "calls": 1028,
+        "self_seconds": 0.0011987,
+        "cumulative_seconds": 0.0021524
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\result_writer.py",
+        "line": 45,
+        "function": "close",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 1.5e-06,
+        "cumulative_seconds": 0.0003234
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 139,
+        "function": "<genexpr>",
+        "primitive_calls": 245,
+        "calls": 245,
+        "self_seconds": 1.73e-05,
+        "cumulative_seconds": 1.73e-05
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 96,
+        "function": "<genexpr>",
+        "primitive_calls": 75657,
+        "calls": 75658,
+        "self_seconds": 0.012931100000000001,
+        "cumulative_seconds": 0.21574680000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\schemas.py",
+        "line": 49,
+        "function": "empty_result",
+        "primitive_calls": 782,
+        "calls": 782,
+        "self_seconds": 0.0008789000000000001,
+        "cumulative_seconds": 0.2941068
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\config.py",
+        "line": 64,
+        "function": "__post_init__",
+        "primitive_calls": 2,
+        "calls": 2,
+        "self_seconds": 1.6000000000000001e-06,
+        "cumulative_seconds": 2.2e-06
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\engine.py",
+        "line": 89,
+        "function": "call",
+        "primitive_calls": 2104,
+        "calls": 2104,
+        "self_seconds": 0.0101776,
+        "cumulative_seconds": 9.3441533
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\result_writer.py",
+        "line": 40,
+        "function": "write",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 3.3e-06,
+        "cumulative_seconds": 3.5600000000000005e-05
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 133,
+        "function": "<genexpr>",
+        "primitive_calls": 245,
+        "calls": 245,
+        "self_seconds": 1.67e-05,
+        "cumulative_seconds": 1.67e-05
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 158,
+        "function": "for_component",
+        "primitive_calls": 12,
+        "calls": 12,
+        "self_seconds": 9.5e-06,
+        "cumulative_seconds": 2.04e-05
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 478,
+        "function": "__init__",
+        "primitive_calls": 12,
+        "calls": 12,
+        "self_seconds": 1.4000000000000001e-06,
+        "cumulative_seconds": 1.4000000000000001e-06
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 78,
+        "function": "__exit__",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 1.04e-05,
+        "cumulative_seconds": 13.449715800000002
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\reference_data.py",
+        "line": 27,
+        "function": "prepare_signal",
+        "primitive_calls": 49,
+        "calls": 49,
+        "self_seconds": 0.00019150000000000002,
+        "cumulative_seconds": 0.1285856
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 492,
+        "function": "publish",
+        "primitive_calls": 1909,
+        "calls": 1909,
+        "self_seconds": 0.0023913000000000003,
+        "cumulative_seconds": 7.367392700000001
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 92,
+        "function": "monthly_path",
+        "primitive_calls": 48,
+        "calls": 48,
+        "self_seconds": 0.0001975,
+        "cumulative_seconds": 0.0009621
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 275,
+        "function": "portfolio_inputs",
+        "primitive_calls": 49,
+        "calls": 49,
+        "self_seconds": 0.0001395,
+        "cumulative_seconds": 0.0142608
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\reference_data.py",
+        "line": 17,
+        "function": "prepare_open",
+        "primitive_calls": 244,
+        "calls": 244,
+        "self_seconds": 0.000273,
+        "cumulative_seconds": 0.008049800000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\runtime_cache.py",
+        "line": 111,
+        "function": "_number",
+        "primitive_calls": 2196,
+        "calls": 2196,
+        "self_seconds": 0.0013754000000000001,
+        "cumulative_seconds": 0.006542500000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\data_provider.py",
+        "line": 75,
+        "function": "__enter__",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 1.0000000000000001e-07,
+        "cumulative_seconds": 1.0000000000000001e-07
+      },
+      {
+        "file": "D:\\skd-backtest\\src\\skd_backtest\\submission_runner.py",
+        "line": 31,
+        "function": "<genexpr>",
+        "primitive_calls": 14749,
+        "calls": 14749,
+        "self_seconds": 0.0047401000000000006,
+        "cumulative_seconds": 0.017029700000000002
+      }
+    ],
+    "copies": [
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\enum.py",
+        "line": 1319,
+        "function": "__deepcopy__",
+        "primitive_calls": 6758,
+        "calls": 6758,
+        "self_seconds": 0.0004511,
+        "cumulative_seconds": 0.0004511
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\copy.py",
+        "line": 192,
+        "function": "_deepcopy_list",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 5.000000000000001e-07,
+        "cumulative_seconds": 6.000000000000001e-07
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\copy.py",
+        "line": 218,
+        "function": "_deepcopy_dict",
+        "primitive_calls": 3379,
+        "calls": 3384,
+        "self_seconds": 0.0022152,
+        "cumulative_seconds": 0.0030813000000000004
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\copy.py",
+        "line": 173,
+        "function": "_deepcopy_atomic",
+        "primitive_calls": 134349,
+        "calls": 134349,
+        "self_seconds": 0.0070616,
+        "cumulative_seconds": 0.0070616
+      },
+      {
+        "file": "C:\\Users\\HenryZ16\\AppData\\Roaming\\uv\\python\\cpython-3.13-windows-x86_64-none\\Lib\\copy.py",
+        "line": 119,
+        "function": "deepcopy",
+        "primitive_calls": 144392,
+        "calls": 144495,
+        "self_seconds": 0.0687975,
+        "cumulative_seconds": 0.10766410000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\numpy\\_core\\multiarray.py",
+        "line": 1088,
+        "function": "copyto",
+        "primitive_calls": 73933,
+        "calls": 73933,
+        "self_seconds": 0.007639000000000001,
+        "cumulative_seconds": 0.007639000000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\arrow\\array.py",
+        "line": 1406,
+        "function": "copy",
+        "primitive_calls": 3489,
+        "calls": 3489,
+        "self_seconds": 0.0010718000000000001,
+        "cumulative_seconds": 0.0217415
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\range.py",
+        "line": 601,
+        "function": "_shallow_copy",
+        "primitive_calls": 63,
+        "calls": 63,
+        "self_seconds": 0.0001269,
+        "cumulative_seconds": 0.0006737000000000001
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\managers.py",
+        "line": 739,
+        "function": "copy",
+        "primitive_calls": 13862,
+        "calls": 13862,
+        "self_seconds": 0.032778100000000004,
+        "cumulative_seconds": 1.0330044
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\multi.py",
+        "line": 1322,
+        "function": "copy",
+        "primitive_calls": 60,
+        "calls": 60,
+        "self_seconds": 0.0001227,
+        "cumulative_seconds": 0.0017328
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\arrays\\masked.py",
+        "line": 1119,
+        "function": "copy",
+        "primitive_calls": 732,
+        "calls": 732,
+        "self_seconds": 0.000555,
+        "cumulative_seconds": 0.0015389000000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 5286,
+        "function": "_maybe_copy_array_input",
+        "primitive_calls": 14469,
+        "calls": 14469,
+        "self_seconds": 0.005990400000000001,
+        "cumulative_seconds": 0.0073657
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 4420,
+        "function": "_check_copy_deprecation",
+        "primitive_calls": 3780,
+        "calls": 3780,
+        "self_seconds": 0.0006137,
+        "cumulative_seconds": 0.0006137
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 762,
+        "function": "_shallow_copy",
+        "primitive_calls": 9,
+        "calls": 9,
+        "self_seconds": 6e-06,
+        "cumulative_seconds": 2e-05
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py",
+        "line": 6548,
+        "function": "copy",
+        "primitive_calls": 13805,
+        "calls": 13805,
+        "self_seconds": 0.0146478,
+        "cumulative_seconds": 1.1185865000000002
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\indexes\\base.py",
+        "line": 1375,
+        "function": "copy",
+        "primitive_calls": 1272,
+        "calls": 1272,
+        "self_seconds": 0.0015485000000000002,
+        "cumulative_seconds": 0.0128214
+      },
+      {
+        "file": "D:\\skd-backtest\\.venv\\Lib\\site-packages\\pandas\\core\\internals\\blocks.py",
+        "line": 639,
+        "function": "copy",
+        "primitive_calls": 68381,
+        "calls": 68381,
+        "self_seconds": 0.0553656,
+        "cumulative_seconds": 0.2473836
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<method 'copy' of 'numpy.ndarray' objects>",
+        "primitive_calls": 166097,
+        "calls": 166097,
+        "self_seconds": 0.135723,
+        "cumulative_seconds": 0.135723
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<method 'copy' of 'dict' objects>",
+        "primitive_calls": 598,
+        "calls": 598,
+        "self_seconds": 0.0001438,
+        "cumulative_seconds": 0.0001438
+      },
+      {
+        "file": "~",
+        "line": 0,
+        "function": "<method 'copy' of 'list' objects>",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_seconds": 2.0000000000000002e-07,
+        "cumulative_seconds": 2.0000000000000002e-07
+      }
+    ]
+  }
+}

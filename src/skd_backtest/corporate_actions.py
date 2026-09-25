@@ -1,16 +1,25 @@
-"""Account for corporate actions once, in the appropriate price system."""
-
-import logging
+"""Corporate-action placeholder; preserve the account until postings are implemented."""
 
 import pandas as pd
 
-
-logger = logging.getLogger(__name__)
+from .config import BacktestConfig
+from .contracts import ActionResult, Topic
+from .runtime_cache import CacheView
+from .schemas import EVENT_COLUMNS
 
 
 class CorporateActionEngine:
-    def apply(self, *, date: str, actions: pd.DataFrame,
-              account: dict, price_mode: str) -> None:
-        # TODO: raw_price 模式中分红加现金、送转/拆并股调股数，配股按统一政策处理。
-        # adjusted_return 模式不额外入账，避免与复权收益重复计算。
-        logger.debug("[CorporateActionEngine.apply] STUB date=%s, mode=%s; no postings", date, price_mode)
+    def __init__(self, config: BacktestConfig):
+        self.config = config
+
+    def apply(self, *, date: str, cache: CacheView) -> None:
+        dates = cache.read(Topic.RUN_CALENDAR).trading_dates
+        index = dates.index(date)
+        account = (cache.read(Topic.ACCOUNT_CLOSE, dates[index - 1]).account if index
+                   else cache.read(Topic.ACCOUNT_INITIAL).account)
+        if self.config.price_mode == "raw_price":
+            cache.read(Topic.REFERENCE_ACTIONS, date)
+            # TODO: Apply raw-price events using record-date holdings and event deduplication.
+            cache.log(level="DEBUG", message="STUB corporate actions: account unchanged")
+        cache.publish(Topic.ACCOUNT_ACTIONS, date,
+                      ActionResult(date, account, pd.DataFrame(columns=EVENT_COLUMNS)))

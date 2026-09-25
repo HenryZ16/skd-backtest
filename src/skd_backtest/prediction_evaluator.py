@@ -1,20 +1,15 @@
-"""Prediction evaluation never exposes labels to inference."""
+"""Prediction-evaluation placeholder; retain scores without calculated labels."""
 
-import logging
-
-import pandas as pd
-
+from .contracts import PredictionResult, Topic
+from .runtime_cache import CacheView
 from .schemas import empty_result
 
 
-logger = logging.getLogger(__name__)
-
-
 class PredictionEvaluator:
-    def evaluate(self, *, scores: pd.DataFrame, future_returns: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-        # TODO: 按 date/code 对齐分数和完整未来收益，逐调仓日计算 Spearman RankIC。
-        # 预测能力单独评价，不受订单成交结果影响；不向推理和优化器反馈标签。
-        logger.debug("[PredictionEvaluator.evaluate] STUB future-return labels -> RankIC")
-        predictions = scores.loc[:, ["date", "code", "score"]].copy()
-        predictions["future_return"] = None
-        return predictions, empty_result("rankic")
+    def evaluate(self, *, cache: CacheView) -> None:
+        cache.read(Topic.EVALUATION_LABELS)
+        scores = cache.history(Topic.SIGNAL_SCORES)
+        # TODO: Align labels by date/code and calculate each signal day's Spearman RankIC.
+        cache.log(level="DEBUG", message="STUB prediction evaluation: RankIC not calculated")
+        cache.publish(Topic.EVALUATION_PREDICTION, None,
+                      PredictionResult(scores.assign(future_return=None), empty_result("rankic")))

@@ -1,26 +1,51 @@
-"""Future audit-file output boundary; currently logs the intended files at DEBUG."""
+"""Run-log lifecycle and final output boundary; JSON/CSV export is not implemented."""
 
-import logging
-
+from dataclasses import asdict
+import json
 from pathlib import Path
 
-import pandas as pd
-
+from .contracts import OutputReceipt, Topic
+from .runtime_cache import CacheView
 from .schemas import RESULT_COLUMNS
-
-
-logger = logging.getLogger(__name__)
 
 
 class ResultWriter:
     def __init__(self, output_dir: Path | None):
-        self.output_dir = output_dir
+        self.output_dir = Path(output_dir) if output_dir is not None else None
+        self._log = None
+        self._cursor = 0
 
-    def write(self, *, metrics: dict[str, float | int | None], tables: dict[str, pd.DataFrame]) -> None:
-        # TODO: output_dir 配置后写 metrics.json、七张审计 CSV 和 run.log。
-        # 字段由 RESULT_COLUMNS 定义，保持 score -> target -> order -> trade -> NAV 审计链。
-        # JSON 中 None 写为 null；没有输出目录时仅返回内存结果。当前完全不写文件。
-        logger.debug("[ResultWriter.write] STUB output_dir=%s; no files written", self.output_dir)
-        if logger.isEnabledFor(logging.DEBUG):
-            files = ["metrics.json", *(f"{name}.csv" for name in RESULT_COLUMNS), "run.log"]
-            logger.debug("[ResultWriter.files] %s", ", ".join(files))
+    def open(self, *, cache: CacheView) -> None:
+        if self._log is not None:
+            raise RuntimeError("writer is already open")
+        self._cursor = 0
+        if self.output_dir is not None:
+            names = ["metrics.json", "run.log", *(name + ".csv" for name in RESULT_COLUMNS)]
+            if any((self.output_dir / name).exists() for name in names):
+                raise FileExistsError("output directory already contains run results")
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+            self._log = (self.output_dir / "run.log").open("x", encoding="utf-8", newline="\n")
+        context = cache.read(Topic.RUN_CONTEXT)
+        cache.log(level="INFO", message="run configuration",
+                  details=json.loads(json.dumps(asdict(context), default=str, allow_nan=False)))
+        self.flush_log(cache=cache)
+
+    def flush_log(self, *, cache: CacheView) -> None:
+        for record in cache.log_records(after_seq=self._cursor):
+            if self._log is not None:
+                self._log.write(json.dumps(asdict(record), ensure_ascii=False, allow_nan=False) + "\n")
+                self._log.flush()
+            self._cursor = record.seq
+
+    def write(self, *, cache: CacheView) -> None:
+        # TODO: Serialize metrics and the seven CSVs, then publish a written receipt.
+        cache.log(level="DEBUG", message="STUB result export: financial JSON/CSV files not written")
+        cache.publish(Topic.OUTPUT_RECEIPT, None, OutputReceipt("disabled", None, {}))
+
+    def close(self, *, cache: CacheView) -> None:
+        try:
+            self.flush_log(cache=cache)
+        finally:
+            if self._log is not None:
+                self._log.close()
+                self._log = None

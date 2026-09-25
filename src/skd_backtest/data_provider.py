@@ -69,6 +69,8 @@ class DataProvider:
         self._tables = {}
         self._price_state = None
         self.stats = {}
+        self._prepared_dates = None
+        self._playing = False
 
     def __enter__(self):
         return self
@@ -84,12 +86,16 @@ class DataProvider:
         self._pending = None
         self._tables = {}
         self._price_state = None
+        self._prepared_dates = None
+        self._playing = False
 
     def monthly_path(self, dataset: str, year: int, month: int) -> Path:
         return self.config.data_dir / dataset / str(year) / f"{month:02d}" / f"{year}{month:02d}.parquet"
 
     def prepare(self) -> list[str]:
         """Read the real calendar and enough available history for lookback."""
+        if self._playing:
+            raise RuntimeError("cannot prepare during active playback")
         self.close()
         self.stats = {
             "calendar_files": 0, "calendar_seconds": 0.0,
@@ -156,6 +162,7 @@ class DataProvider:
         trading_dates = pd.to_datetime(trading, format="%Y%m%d").strftime("%Y-%m-%d").tolist()
         logger.debug("[DataProvider.prepare] %s .. %s; %s trading days, %s warmup days",
                      self.config.start_date, self.config.end_date, len(trading_dates), self.stats["warmup_days"])
+        self._prepared_dates = tuple(trading_dates)
         return trading_dates
 
     def _read_batch(self, months):
@@ -268,10 +275,7 @@ class DataProvider:
     def portfolio_inputs(self, as_of_date: str) -> dict[str, pd.DataFrame]:
         day = self._ensure_loaded(as_of_date)
         return {
-            # No fabricated equal-weight benchmark or industry classifications.
-            "benchmark_weights": pd.DataFrame(columns=["code", "benchmark_weight"]),
             "barra_exposures": self._slice(self._tables["Barra_factor"], day, day),
-            "industries": pd.DataFrame(columns=["code", "industry"]),
         }
 
     def open_market(self, date: str) -> pd.DataFrame:
@@ -306,8 +310,13 @@ class DataProvider:
 
         Use contextlib.closing() when stopping early or when a consumer can fail.
         """
+        if self._playing:
+            raise RuntimeError("playback is already active")
         with self:
-            dates = self.prepare()
+            dates = (list(self._prepared_dates)
+                     if self._prepared_dates is not None and self._current_date is None
+                     else self.prepare())
+            self._playing = True
             for index, date in enumerate(dates):
                 execution_date = dates[index + 1] if index + 1 < len(dates) else None
                 signal = ("Barra_factor" in self._datasets and index % self.config.rebalance_interval == 0
@@ -341,12 +350,3 @@ class DataProvider:
                         market[name] = market[name].fillna(False).astype(bool)
                 parts.append(market)
         return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=columns)
-
-    def corporate_actions(self, date: str) -> pd.DataFrame:
-        # Adjusted prices already reflect corporate actions; never post them twice.
-        return pd.DataFrame(columns=["date", "code", "action", "cash_per_share", "share_ratio"])
-
-    def future_returns(self, holding_period: int) -> pd.DataFrame:
-        # TODO: Evaluator-only Open(t+H+1) / Open(t+1) - 1 on the trading calendar.
-        logger.debug("[DataProvider.future_returns] STUB H=%s; evaluator only", holding_period)
-        return pd.DataFrame(columns=["date", "code", "future_return"])
