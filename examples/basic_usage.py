@@ -29,5 +29,7 @@ if __name__ == "__main__":
         inference=model.predict,
         optimizer_config=OptimizerConfig(top_k=300),  # 全部成分股的目标权重均为 1/300。
     )
-    pprint(engine.run())
-    pprint(engine.performance)
+    metrics = engine.run()
+    if not engine.config.friendly_output:
+        pprint(metrics)
+        pprint(engine.performance)

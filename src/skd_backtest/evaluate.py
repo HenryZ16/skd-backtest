@@ -47,14 +47,19 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--submission", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--friendly-output", action=argparse.BooleanOptionalAction, default=None,
+                        help="show progress and a result table (default: enabled; overrides config)")
     args = parser.parse_args(argv)
     options = load_config(args.config)
+    if args.friendly_output is not None:
+        options["friendly_output"] = args.friendly_output
     # The evaluation entry always emits the required audit files.
     if options.get("output_dir") is None:
         options["output_dir"] = Path("result") / args.submission.resolve().name
     engine = BacktestEngine(submission_dir=args.submission, **options)
     metrics = engine.run()
-    print(json.dumps(metrics, ensure_ascii=False, allow_nan=False, indent=2))
+    if not engine.config.friendly_output:
+        print(json.dumps(metrics, ensure_ascii=False, allow_nan=False, indent=2))
     return 0
 
 

@@ -96,6 +96,7 @@ class BacktestConfig:
     label_price_basis: Literal["adjusted_open", "raw_open"] = "adjusted_open"
     data_capabilities: DataCapabilities = field(default_factory=DataCapabilities)
     reference_sources: ReferenceSources = field(default_factory=ReferenceSources)
+    friendly_output: bool = True
 
     def __post_init__(self):
         object.__setattr__(self, "data_dir", Path(self.data_dir))
@@ -119,6 +120,8 @@ class BacktestConfig:
             raise ValueError("random_seed must be an integer in [0, 2**32)")
         if not isinstance(self.async_inference, bool):
             raise TypeError("async_inference must be a boolean")
+        if not isinstance(self.friendly_output, bool):
+            raise TypeError("friendly_output must be a boolean")
         for name, allowed in (
             ("price_mode", ("adjusted_return", "raw_price")),
             ("benchmark_mode", ("none", "csi300")),

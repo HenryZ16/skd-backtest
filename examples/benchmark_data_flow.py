@@ -119,6 +119,7 @@ def run_once(args, prefetch, scope):
         data_dir=args.data_dir, start_date=args.start_date, end_date=args.end_date,
         inference=inference, lookback=args.lookback, rebalance_interval=args.rebalance_interval,
         read_batch_months=args.read_batch_months, prefetch=prefetch, async_inference=args.async_inference,
+        friendly_output=False,
     )
     if scope == "engine":
         engine.run()

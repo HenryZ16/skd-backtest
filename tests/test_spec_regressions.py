@@ -1,5 +1,5 @@
 """Regressions for the independent full-specification audit."""
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 from io import StringIO
 import json
@@ -114,12 +114,29 @@ class SpecRegressionTests(unittest.TestCase):
             "optimizer": {"top_k": 1},
         }
         path = self.root / "config.json"
-        path.write_text(json.dumps(config), encoding="utf-8")
-        with redirect_stdout(StringIO()) as output:
-            self.assertEqual(main(["--submission", str(directory), "--config", str(path)]), 0)
-        metrics = json.loads(output.getvalue())
-        self.assertEqual(metrics, json.loads((self.root / "cli-output/metrics.json").read_text()))
-        self.assertEqual(len(list((self.root / "cli-output").iterdir())), 9)
+        for setting, flag, friendly in (
+            (None, None, True), (False, None, False),
+            (True, "--no-friendly-output", False), (False, "--friendly-output", True),
+        ):
+            folder = self.root / f"cli-output-{setting}-{flag}"
+            config["backtest"]["output_dir"] = folder.name
+            if setting is not None:
+                config["backtest"]["friendly_output"] = setting
+            path.write_text(json.dumps(config), encoding="utf-8")
+            argv = ["--submission", str(directory), "--config", str(path)]
+            with (self.subTest(setting=setting, flag=flag), redirect_stdout(StringIO()) as output,
+                  redirect_stderr(StringIO()) as progress):
+                self.assertEqual(main(argv + ([flag] if flag else [])), 0)
+            metrics = json.loads((folder / "metrics.json").read_text())
+            if friendly:
+                self.assertEqual(output.getvalue().count("回测完成"), 1)
+                self.assertIn("平均 RankIC", output.getvalue())
+                self.assertNotIn('"total_return":', output.getvalue())
+                self.assertIn("100.0%", progress.getvalue())
+            else:
+                self.assertEqual(json.loads(output.getvalue()), metrics)
+                self.assertEqual(progress.getvalue(), "")
+            self.assertEqual(len(list(folder.iterdir())), 9)
 
     def test_suspended_finite_close_never_enters_history_or_seed_in_either_mode(self):
         for mode in ("adjusted_return", "raw_price"):

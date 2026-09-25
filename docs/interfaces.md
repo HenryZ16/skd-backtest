@@ -198,6 +198,7 @@ INITIALIZE
 | `reference_sources` | 基准收益、权重、行业及风险参数的可选输入路径；源文件适配由 Reference Data 独占 |
 | `backtest.prefetch` | 默认 True，控制下一批行情读取预取 |
 | `backtest.async_inference` | 默认 True，独立控制顺序推理线程；False 在 SIGNAL 同步调用 |
+| `backtest.friendly_output` | 默认 True，显示交易日进度和结果表；False 时引擎不主动打印进度或结果，评测入口向标准输出打印指标 JSON；不影响金融结果 |
 | `backtest.random_seed` | 默认 0，模型加载和推理的 Python/NumPy 传统随机流种子 |
 | `protocol_version` | 固定接口版本，随输出运行记录保存 |
 
@@ -556,7 +557,7 @@ Result Writer 输出 metrics.json、七张 CSV 和 run.log。它只序列化已�
 
 | 独占任务 | 文件范围 |
 |---|---|
-| 基础设施与接口接入 | `src/skd_backtest/contracts.py`、`runtime_cache.py`； `engine.py`、`inference_pipeline.py`、`config.py`、`schemas.py`、`__init__.py` 及依赖声明 |
+| 基础设施与接口接入 | `src/skd_backtest/contracts.py`、`runtime_cache.py`； `engine.py`、`inference_pipeline.py`、`console.py`、`config.py`、`schemas.py`、`__init__.py` 及依赖声明 |
 | 市场数据流 | `src/skd_backtest/data_provider.py` |
 | 非市场参考数据 | `src/skd_backtest/reference_data.py` |
 | 未来收益标签 | `src/skd_backtest/label_provider.py` |

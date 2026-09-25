@@ -115,7 +115,7 @@ def main():
                 sleep(args.inference_delay_ms / 1000)
             return model.predict(**kwargs)
 
-        extra = {"async_inference": args.async_inference} if args.source == "current" else {}
+        extra = {"async_inference": args.async_inference, "friendly_output": False} if args.source == "current" else {}
         engine = BacktestEngine(data_dir=r"D:\Data", start_date="2016-01-01",
                                 end_date=args.end, inference=inference,
                                 optimizer_config=OptimizerConfig(top_k=50), prefetch=not args.sync, **extra)

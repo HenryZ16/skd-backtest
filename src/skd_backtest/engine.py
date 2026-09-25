@@ -10,6 +10,7 @@ import pandas as pd
 from .accounting import PortfolioAccounting
 from .broker import Broker
 from .config import BacktestConfig, CostConfig, DataCapabilities, OptimizerConfig, ReferenceSources
+from .console import ConsoleReporter
 from .contracts import ComponentRole as Role, MarketContext, Phase, RunCalendar, RunContext, Topic
 from .cost_model import CostModel
 from .data_provider import DataProvider
@@ -37,6 +38,7 @@ class BacktestEngine:
         cost_config: CostConfig | None = None,
         trading_days_per_year: int = 252, risk_free_rate: float = 0.0,
         output_dir: str | Path | None = None,
+        friendly_output: bool = True,
         read_batch_months: int = 12, prefetch: bool = True, async_inference: bool = True,
         random_seed: int = 0,
         benchmark_mode: Literal["none", "csi300"] = "none",
@@ -50,6 +52,7 @@ class BacktestEngine:
             holding_period=holding_period, lookback=lookback, price_mode=price_mode,
             trading_days_per_year=trading_days_per_year, risk_free_rate=risk_free_rate,
             output_dir=Path(output_dir) if output_dir is not None else None,
+            friendly_output=friendly_output,
             read_batch_months=read_batch_months, prefetch=prefetch, async_inference=async_inference,
             random_seed=random_seed,
             benchmark_mode=benchmark_mode, label_price_basis=label_price_basis,
@@ -94,6 +97,7 @@ class BacktestEngine:
             self.submission_runner.reset_random_state()
         self.trading_dates, self.performance = [], {}
         started = perf_counter()
+        console = ConsoleReporter(self.config.friendly_output)
         cache = RuntimeCache(context=RunContext(self.config, self.optimizer_config, self.cost_config))
         views = {role: cache.for_component(role) for role in Role}
         control = views[Role.ENGINE]
@@ -109,18 +113,20 @@ class BacktestEngine:
             return method(cache=views[role], **kwargs)
 
         try:
+            console.status("准备回测数据…")
             call(Role.WRITER, self.result_writer.open)
             self.config.validate_capabilities(self.optimizer_config)
             active_component = "data_provider.prepare"
             dates = self.data_provider.prepare()
             calendar = RunCalendar.from_dates(dates, self.config.rebalance_interval)
             control.publish(Topic.RUN_CALENDAR, None, calendar)
+            console.progress(0, len(dates))
             playback_started = perf_counter()
             with closing(inference_days(
                 self.data_provider.playback(), self.submission_runner,
                 rebalance_interval=self.config.rebalance_interval, enabled=self.config.async_inference,
             )) as days:
-                for day, prediction in days:
+                for completed, (day, prediction) in enumerate(days, start=1):
                     date = day.date
                     self.trading_dates.append(date)
                     market_rows += len(day.open_market)
@@ -166,14 +172,18 @@ class BacktestEngine:
                         call(Role.OPTIMIZER, self.optimizer.optimize, signal_date=date)
                     call(Role.WRITER, self.result_writer.flush_log)
                     cache.finish_day(date=date)
+                    console.progress(completed, len(dates), date)
                     active_component = "data_provider.playback"
             playback_seconds = perf_counter() - playback_started
+            console.status("计算标签与评价指标…")
             cache.advance(date=None, phase=Phase.EVALUATION)
             call(Role.LABEL_PROVIDER, self.label_provider.build)
             call(Role.EVALUATOR, self.prediction_evaluator.evaluate)
             cache.advance(date=None, phase=Phase.METRICS)
             call(Role.METRICS, self.metrics_calculator.calculate)
             cache.advance(date=None, phase=Phase.OUTPUT)
+            if self.config.output_dir is not None:
+                console.status("保存回测结果…")
             call(Role.WRITER, self.result_writer.write)
             control.read(Topic.OUTPUT_RECEIPT)  # Require a completed output/disabled receipt.
             metrics = control.read(Topic.EVALUATION_METRICS)
@@ -217,6 +227,7 @@ class BacktestEngine:
                     cache.advance(date=cache.date, phase=Phase.FAILED)
                     control.log(level="ERROR", message=str(exc), details={"component": component + ".close"})
             cache.close()
+            console.close()
             if cleanup_error is not None and not failed:
                 raise cleanup_error
         # Publish public success state only after resources have closed successfully.
@@ -231,4 +242,6 @@ class BacktestEngine:
             "source_rows_per_second": sum(self.data_provider.stats["source_rows"].values()) / elapsed,
             "data": self.data_provider.stats.copy(),
         }
+        console.results(self.metrics, trading_days=len(self.trading_dates), elapsed=elapsed,
+                        output_dir=self.config.output_dir)
         return self.metrics

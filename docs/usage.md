@@ -45,13 +45,12 @@ engine = BacktestEngine(
     read_batch_months=12,            # 每批最多 12 个自然月
     prefetch=True,                   # 后台预取下一批行情
     async_inference=True,            # 独立推理线程；False 使用同步推理
+    friendly_output=True,            # 默认显示进度和结果表；False 时引擎不主动打印
     price_mode="adjusted_return",
     optimizer_config=OptimizerConfig(top_k=300),  # 沪深300全部成分股等权目标
     cost_config=CostConfig(slippage=0.0),
 )
-metrics = engine.run()
-print(metrics)                       # 15 项原始指标；未定义值为 None
-print(engine.metrics)
+metrics = engine.run()               # 自动展示结果；仍返回 15 项原始指标，未定义值为 None
 print(engine.trading_dates)          # 实际遍历的全部交易日
 print(engine.tables["predictions"]) # 模型分数与独立计算的 future_return
 print(engine.performance)           # 读取、播放、推理及框架耗时
@@ -103,6 +102,8 @@ metrics = engine.run()
 python evaluate.py --submission submissions/team_001 --config configs/private.toml
 # 安装包也提供同样的命令：
 skd-evaluate --submission submissions/team_001 --config configs/private.toml
+# 关闭进度和结果表，向标准输出打印指标 JSON：
+skd-evaluate --submission submissions/team_001 --config configs/private.toml --no-friendly-output
 ~~~
 
 最小 TOML：
@@ -113,6 +114,7 @@ data_dir = "D:/Data"
 start_date = "2016-01-01"
 end_date = "2022-12-31"
 random_seed = 0
+friendly_output = true
 output_dir = "../result/team_001"
 
 [optimizer]
@@ -124,7 +126,8 @@ top_k = 50
 字段与对应数据类同名。相对数据和输出路径相对于配置文件目录解析。
 统一入口未指定 output_dir 时使用 `result/<提交目录名>`，必定生成审计文件。
 费用表使用 costs.fee_schedule 条目，包含 effective_date、stamp_tax_rate、transfer_fee_rate。
-直接使用 Engine 时仍可 output_dir=None，仅返回内存结果。
+直接使用 Engine 时仍可 output_dir=None，不写结果文件。
+`--friendly-output` / `--no-friendly-output` 优先于配置文件中的 `backtest.friendly_output`。
 
 ## 数据约定
 
@@ -229,7 +232,7 @@ selected = engine.data_provider.valuation_inputs(codes=["SZ000001", "SH600000"])
 可选：`initial_cash`、`rebalance_interval`、`holding_period`、`lookback`、
 `price_mode`、`optimizer_config`、`cost_config`、`trading_days_per_year`、
 `risk_free_rate`、`output_dir`、`read_batch_months`（默认 12）、`prefetch`（默认 True）、
-`async_inference`（默认 True）、`random_seed`（默认 0），
+`async_inference`（默认 True）、`friendly_output`（默认 True）、`random_seed`（默认 0），
 以及 `benchmark_mode`（默认 none）、`label_price_basis`（默认 adjusted_open）、
 `data_capabilities` 和 `reference_sources`。
 无风险利率按年化小数配置，费率和权重均用小数。
@@ -297,6 +300,14 @@ Fully Invested=True 时无法满仓会报错；False 允许持有剩余现金。
 现金不足时缩量并重新报价，只有最终接受的报价计入成交。
 
 ## 返回指标与审计输出
+
+默认 `friendly_output=True`：准备数据时显示阶段提示，回放时显示已完成/总交易日、百分比、
+最新完成日期、已用时间及预计剩余回放时间；回放后提示评价和文件保存阶段。
+进度写入标准错误，终端内原位刷新，重定向时改用低频换行记录。回放达到 100% 后仍需完成评价、输出和资源清理。
+成功结束后向标准输出打印全部 15 项指标的中文表格、交易日数、耗时及已配置的结果目录。
+收益率、风险和换手等以百分比展示，费用保留两位小数，未定义值显示 N/A；原始返回值与 JSON/CSV 不做展示性舍入。
+关闭时，`engine.run()` 不主动打印进度或结果，统一评测入口向标准输出打印指标 JSON；调用方及模型自身的打印不受影响。
+性能测试脚本显式关闭友好输出，保留 JSON 解析和性能测量方式。
 
 `engine.run()` 返回以下扁平字典，`engine.metrics` 保存该结果。
 None 表示没有有效样本、比率未定义或未启用基准。示例的模型分数全部相同，因此 RankIC 相关指标为 None；组合收益仍正常计算。
