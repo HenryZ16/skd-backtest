@@ -38,3 +38,7 @@ naive 模型为当日全部沪深300成分股统一输出零分，`top_k=300` �
 - [性能基线](docs/benchmarks.md)：复测方法、吞吐与内存结果、指标口径。
 - [总设计独立审查](docs/spec_audit.md)：需求覆盖矩阵、返修闭合与独立验证。
 - [开发规格](BACKTEST_PLATFORM_SPEC_v2.md)：只读需求文档。
+
+## 许可证
+
+本项目采用 [Apache License 2.0](LICENSE) 许可。
