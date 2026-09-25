@@ -13,7 +13,13 @@
 
 ## 快速开始
 
-需要 Python 3.11 及以上，在项目根目录执行：
+需要 Python 3.11 及以上。发行包的 pip 和 uv 安装方式见[使用说明](docs/usage.md)。安装后有两种独立的使用方式：
+
+**Python API（个人单模型回测）**：用户对自己的单个模型进行回测时，建议参考 [examples/basic_usage.py](examples/basic_usage.py) 使用 Python API，将已初始化模型的 `model.predict` 作为 `inference` 传给 `BacktestEngine`。
+
+**命令行评测（评测平台批量回测）**：`skd-backtest-evaluate` 是本包提供的命令行评测入口，推荐用于评测平台批量回测时使用。每次调用处理一个标准提交，由平台调度多个调用，例如 `skd-backtest-evaluate --submission submission --config config.toml`。`skd-backtest-evaluate --help` 同时提供这两种使用方式的说明和完整单模型示例。
+
+从源码开发或运行仓库示例时，在项目根目录执行：
 
 ```powershell
 python -m pip install -e .
@@ -25,9 +31,7 @@ naive 模型为当日全部沪深300成分股统一输出零分，`top_k=300` �
 每5个交易日生成调仓信号，下一交易日开盘执行；实际持仓受停牌等交易限制影响。
 运行前请将示例中的 `data_dir` 改为实际数据目录。
 
-接入自己的模型时，将已初始化模型的 `model.predict` 作为 `inference` 传给
-`BacktestEngine`；也可传入 `submission_dir`，由平台加载标准提交并管理每次评测的模型实例。
-`python evaluate.py --submission submission --config config.toml` 提供统一评测入口。
+`BacktestEngine` 也支持传入 `submission_dir`，由平台加载标准提交并管理每次评测的模型实例。
 完整配置、风险数据与可复现性约定见[使用说明](docs/usage.md)。
 
 ## 文档

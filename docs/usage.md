@@ -2,11 +2,35 @@
 
 [项目首页](../README.md) · [使用说明](usage.md) · [实现设计](design.md) · [性能基线](benchmarks.md)
 
-以下命令均在项目根目录执行。完整回测链路已实现；示例通过 engine.run() 计算交易、账户、标签和评价指标。
+完整回测链路已实现；示例通过 engine.run() 计算交易、账户、标签和评价指标。源码开发和仓库示例命令在项目根目录执行。
 
 ## 安装与运行
 
-Python 3.11 及以上，在项目根目录执行：
+需要 Python 3.11 及以上。`0.1.0-beta.2` 提供可直接安装的 wheel，Python 包版本为 `0.1.0b2`：
+
+使用 pip：
+
+```powershell
+python -m pip install "https://github.com/HenryZ16/skd-backtest/releases/download/v0.1.0-beta.2/skd_backtest-0.1.0b2-py3-none-any.whl"
+skd-backtest-evaluate --help
+```
+
+使用 uv（Windows / PowerShell；示例采用 Python 3.13，框架支持 Python 3.11 及以上）：
+
+```powershell
+uv venv --python 3.13 .venv
+uv pip install --python .venv "https://github.com/HenryZ16/skd-backtest/releases/download/v0.1.0-beta.2/skd_backtest-0.1.0b2-py3-none-any.whl"
+.\.venv\Scripts\skd-backtest-evaluate.exe --help
+```
+
+已有符合版本要求的 `.venv` 时，可跳过创建环境。macOS / Linux 的命令入口位于 `.venv/bin/skd-backtest-evaluate`。
+
+**Python API（个人单模型回测）**：用户对自己的单个模型进行回测时，建议参考 [examples/basic_usage.py](../examples/basic_usage.py) 使用 Python API，将已初始化模型的 `model.predict` 作为 `inference` 传给 `BacktestEngine`。
+
+**命令行评测（评测平台批量回测）**：`skd-backtest-evaluate` 是本包提供的命令行评测入口，推荐用于评测平台批量回测时使用。每次调用通过 `--submission` 指定一个标准模型提交目录、通过 `--config` 指定 JSON/TOML 配置，由平台调度多个调用。该命令由 `pyproject.toml` 的 `[project.scripts]` 声明，安装时自动生成，实际调用 `skd_backtest.evaluate.main()`，无需另装工具。在安装包的同一 Python 环境中，`python -m skd_backtest.evaluate` 提供相同入口。`-h`、`-help` 和 `--help` 均展示这两种独立使用方式的说明和完整 `basic_usage.py` 示例代码。
+
+附件和版本说明见 [GitHub Release](https://github.com/HenryZ16/skd-backtest/releases/tag/v0.1.0-beta.2)。数据集需单独准备。
+若要开发或运行仓库中的示例，在项目根目录执行：
 
 ```powershell
 python -m pip install -e .
@@ -96,14 +120,14 @@ metrics = engine.run()
 外部熵及非确定性硬件算法由参赛者固定种子/配置；平台不自动改写参赛代码。
 直接传 callable 时，平台重置上述随机流，但其自有模型内部状态仍由调用者复位或重新创建。
 
-统一入口使用 JSON 或 TOML 配置：
+评测平台批量回测推荐使用 `skd-backtest-evaluate`；一次调用处理一个标准提交，批量任务由平台调度。统一入口使用 JSON 或 TOML 配置：
 
 ~~~powershell
 python evaluate.py --submission submissions/team_001 --config configs/private.toml
 # 安装包也提供同样的命令：
-skd-evaluate --submission submissions/team_001 --config configs/private.toml
+skd-backtest-evaluate --submission submissions/team_001 --config configs/private.toml
 # 关闭进度和结果表，向标准输出打印指标 JSON：
-skd-evaluate --submission submissions/team_001 --config configs/private.toml --no-friendly-output
+skd-backtest-evaluate --submission submissions/team_001 --config configs/private.toml --no-friendly-output
 ~~~
 
 最小 TOML：

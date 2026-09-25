@@ -2,12 +2,14 @@
 
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
 import pandas as pd
 
 from skd_backtest.console import ConsoleReporter
+from skd_backtest.evaluate import main
 from skd_backtest.schemas import RESULT_COLUMNS
 import test_financial_integration as fixtures
 
@@ -101,6 +103,31 @@ class ConsoleTest(unittest.TestCase):
         for value in ("false", 0, None):
             with self.subTest(value=value), self.assertRaisesRegex(TypeError, "friendly_output"):
                 self.engine(friendly_output=value)
+
+
+
+class EvaluationHelpTest(unittest.TestCase):
+    def test_help_explains_usage_and_contains_the_complete_standalone_example(self):
+        example = (Path(__file__).resolve().parents[1] / "examples" / "basic_usage.py").read_text(encoding="utf-8").strip()
+        for flag in ("-h", "-help", "--help"):
+            output = StringIO()
+            with self.subTest(flag=flag), redirect_stdout(output), self.assertRaises(SystemExit) as exited:
+                main([flag])
+            self.assertEqual(exited.exception.code, 0)
+            help_text = output.getvalue()
+            self.assertTrue(help_text.startswith("usage: skd-backtest-evaluate "))
+            self.assertIn("推荐用于评测平台批量回测时使用", help_text)
+            self.assertIn("每次调用处理一个标准模型提交", help_text)
+            self.assertIn("用户对自己的单个模型进行回测时，建议参考 examples/basic_usage.py", help_text)
+            api_paragraph = next(p for p in help_text.split("\n\n") if "用户对自己的单个模型" in p)
+            cli_paragraph = next(p for p in help_text.split("\n\n") if "skd-backtest-evaluate 是本包" in p)
+            self.assertNotEqual(api_paragraph, cli_paragraph)
+            self.assertTrue(api_paragraph.startswith("Python API（个人单模型回测）："))
+            self.assertTrue(cli_paragraph.startswith("命令行评测（评测平台批量回测）："))
+            self.assertIn(
+                "\n".join(line for line in example.splitlines() if line.strip()),
+                "\n".join(line for line in help_text.splitlines() if line.strip()),
+            )
 
 
 if __name__ == "__main__":

@@ -66,7 +66,7 @@
 | 514–537：metrics.json、七 CSV、run.log 及关键字段 | 未限定 | 通过。schemas.py 固定审计列；result_writer.py:24–118 实际生成九个文件；统一评测入口保证有输出目录。 |
 | 539–545：拒单原因与完整审计链 | 未限定 | 通过。订单/成交包含 signal_date、order_id 关联信息；从分数、目标、订单、成交、持仓可追踪至每日 NAV。 |
 | 551–562：各模块边界 | 未限定 | 通过。SubmissionRunner、DataProvider、Evaluator、Optimizer、Broker、CostModel、Accounting、Metrics、Writer 各司其职；公司行为行按用户覆盖排除。 |
-| 574–580：统一运行命令示例 | 建议 | 已提供 evaluate.py、包内入口及 skd-evaluate；采用 JSON/TOML。规格的 YAML 命令是建议，不要求特定文件格式。 |
+| 574–580：统一运行命令示例 | 建议 | 已提供 evaluate.py、包内入口及 skd-backtest-evaluate；采用 JSON/TOML。规格的 YAML 命令是建议，不要求特定文件格式。 |
 | 584：完整统一运行链 | 未限定 | 通过。标准加载→一次初始化→交易日历→截至当日输入→推理与校验→标签/预测评价→优化→下一开盘→现金持仓→日估值→指标→文件均有实际路径；标签在事后评价阶段计算，避免暴露未来信息。 |
 | 592–597：无未来信息、信号执行分离、历史规则、目标实际分离、价格分离 | 未限定 | 通过。对应数据包、日历、Broker、CostModel 和 Accounting 行为均已核查；公司行为原则按用户指令排除。 |
 | 598：同提交/数据/配置可复现 | 未限定 | 通过标准评测生命周期及声明的数值环境/提交契约验收。random_seed 默认 0；加载和推理使用 Runner 私有 Python/NumPy 随机流；标准提交重复评测重建模型。 |
