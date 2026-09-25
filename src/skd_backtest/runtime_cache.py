@@ -12,13 +12,13 @@ from typing import NamedTuple
 import pandas as pd
 
 from .contracts import (
-    AccountState, ActionResult, BenchmarkDay, CacheKey, CloseSnapshot, ComponentRole as Role,
+    AccountState, BenchmarkDay, CacheKey, CloseSnapshot, ComponentRole as Role,
     CostQuote, CostRequest, Dataset, ExecutionResult, InitialAccount, LogRecord, MarketContext,
     OpenSnapshot, OutputReceipt, Phase, PortfolioInputs, PredictionResult, RunCalendar,
     RunContext, TargetPlan, Topic,
 )
 from .schemas import (
-    ACTION_COLUMNS, EVENT_COLUMNS, LABEL_COLUMNS, LOCK_COLUMNS, METRIC_NAMES, RESULT_COLUMNS,
+    LABEL_COLUMNS, LOCK_COLUMNS, METRIC_NAMES, RESULT_COLUMNS,
     SCORE_COLUMNS, STATE_COLUMNS, VALUE_COLUMNS, WEIGHT_COLUMNS,
 )
 
@@ -35,18 +35,16 @@ _RULES = {
     Topic.RUN_CONTEXT: _Rule(Role.ENGINE, Phase.INITIALIZE, RunContext, tuple(Role), "run"),
     Topic.RUN_CALENDAR: _Rule(Role.ENGINE, Phase.INITIALIZE, RunCalendar, tuple(Role), "run"),
     Topic.ACCOUNT_INITIAL: _Rule(Role.ENGINE, Phase.INITIALIZE, InitialAccount,
-                                (Role.CORPORATE_ACTIONS, Role.ACCOUNTING), "run"),
+                                (Role.BROKER, Role.ACCOUNTING), "run"),
     Topic.MARKET_CONTEXT: _Rule(Role.ENGINE, Phase.SIGNAL, MarketContext, (Role.REFERENCE_DATA,)),
-    Topic.REFERENCE_ACTIONS: _Rule(Role.REFERENCE_DATA, Phase.PRE_OPEN, Dataset, (Role.CORPORATE_ACTIONS,)),
     Topic.REFERENCE_BENCHMARK: _Rule(Role.REFERENCE_DATA, Phase.CLOSE_VALUE, Dataset, (Role.ACCOUNTING,)),
     Topic.REFERENCE_PORTFOLIO: _Rule(Role.REFERENCE_DATA, Phase.SIGNAL, PortfolioInputs,
                                    (Role.RUNNER, Role.OPTIMIZER)),
-    Topic.ACCOUNT_ACTIONS: _Rule(Role.CORPORATE_ACTIONS, Phase.PRE_OPEN, ActionResult, (Role.BROKER,)),
-    Topic.ACCOUNT_SETTLED: _Rule(Role.BROKER, Phase.PRE_OPEN, AccountState, (Role.ACCOUNTING,)),
+    Topic.ACCOUNT_SETTLED: _Rule(Role.BROKER, Phase.SETTLEMENT, AccountState, (Role.ACCOUNTING,)),
     Topic.ACCOUNT_OPEN: _Rule(Role.ACCOUNTING, Phase.OPEN_VALUE, OpenSnapshot, (Role.BROKER, Role.ACCOUNTING)),
     Topic.EXECUTION_DAY: _Rule(Role.BROKER, Phase.EXECUTION, ExecutionResult, (Role.ACCOUNTING,)),
     Topic.ACCOUNT_CLOSE: _Rule(Role.ACCOUNTING, Phase.CLOSE_VALUE, CloseSnapshot,
-                              (Role.CORPORATE_ACTIONS, Role.ACCOUNTING, Role.OPTIMIZER)),
+                              (Role.BROKER, Role.ACCOUNTING, Role.OPTIMIZER)),
     Topic.SIGNAL_SCORES: _Rule(Role.RUNNER, Phase.SIGNAL, pd.DataFrame,
                              (Role.OPTIMIZER, Role.LABEL_PROVIDER, Role.EVALUATOR)),
     Topic.SIGNAL_TARGETS: _Rule(Role.OPTIMIZER, Phase.SIGNAL, TargetPlan, (Role.BROKER,), "execution"),
@@ -59,8 +57,6 @@ _RULES = {
     Topic.OUTPUT_RECEIPT: _Rule(Role.WRITER, Phase.OUTPUT, OutputReceipt, (), "run"),
 }
 _DEPENDENCIES = {
-    Topic.ACCOUNT_ACTIONS: (Topic.REFERENCE_ACTIONS,),
-    Topic.ACCOUNT_SETTLED: (Topic.ACCOUNT_ACTIONS,),
     Topic.REFERENCE_PORTFOLIO: (Topic.MARKET_CONTEXT,),
     Topic.ACCOUNT_CLOSE: (Topic.REFERENCE_BENCHMARK,),
     Topic.SIGNAL_SCORES: (Topic.REFERENCE_PORTFOLIO,),
@@ -69,7 +65,7 @@ _DEPENDENCIES = {
 }
 _REQUIRED = {
     Phase.INITIALIZE: (Topic.RUN_CALENDAR,),
-    Phase.PRE_OPEN: (Topic.REFERENCE_ACTIONS, Topic.ACCOUNT_ACTIONS, Topic.ACCOUNT_SETTLED),
+    Phase.SETTLEMENT: (Topic.ACCOUNT_SETTLED,),
     Phase.OPEN_VALUE: (Topic.ACCOUNT_OPEN,),
     Phase.EXECUTION: (Topic.EXECUTION_DAY,),
     Phase.CLOSE_VALUE: (Topic.REFERENCE_BENCHMARK, Topic.ACCOUNT_CLOSE),
@@ -125,8 +121,6 @@ class RuntimeCache:
         self._active_quote = None
         self._audit = {name: [] for name in RESULT_COLUMNS}
         self._score_history = []
-        self._event_history = []
-        self._event_ids = set()
         self._checked_schemas = set()
         self._results = None
         self._scores = None
@@ -176,13 +170,13 @@ class RuntimeCache:
         if self._day_finished:
             dates = self._calendar.trading_dates
             next_index = self._day_index + 1
-            expected = (Phase.PRE_OPEN, dates[next_index]) if next_index < len(dates) else (Phase.EVALUATION, None)
+            expected = (Phase.SETTLEMENT, dates[next_index]) if next_index < len(dates) else (Phase.EVALUATION, None)
         elif self._phase == Phase.INITIALIZE:
             self._complete_phase()
             dates = self._calendar.trading_dates
-            expected = (Phase.PRE_OPEN, dates[0]) if dates else (Phase.EVALUATION, None)
+            expected = (Phase.SETTLEMENT, dates[0]) if dates else (Phase.EVALUATION, None)
         else:
-            successors = {Phase.PRE_OPEN: Phase.OPEN_VALUE, Phase.OPEN_VALUE: Phase.EXECUTION,
+            successors = {Phase.SETTLEMENT: Phase.OPEN_VALUE, Phase.OPEN_VALUE: Phase.EXECUTION,
                           Phase.EXECUTION: Phase.CLOSE_VALUE, Phase.EVALUATION: Phase.METRICS,
                           Phase.METRICS: Phase.OUTPUT}
             if self._phase == Phase.CLOSE_VALUE and self._date in self._signals:
@@ -197,7 +191,7 @@ class RuntimeCache:
             raise RuntimeError(f"expected {expected}, got {(phase, date)}")
         self._phase, self._date = phase, date
         self._day_finished = False
-        if phase == Phase.PRE_OPEN:
+        if phase == Phase.SETTLEMENT:
             self._day_index += 1
             self._quote_id = 0
 
@@ -224,8 +218,6 @@ class RuntimeCache:
         self._live.clear()
         self._audit.clear()
         self._score_history.clear()
-        self._event_history.clear()
-        self._event_ids.clear()
         self._checked_schemas.clear()
         self._results = None
         self._scores = None
@@ -254,12 +246,12 @@ class RuntimeCache:
             if self._phase != Phase.EXECUTION or key != self._active_quote:
                 raise RuntimeError("cost reads require the active request")
             return
-        if topic == Topic.ACCOUNT_CLOSE and role in (Role.ACCOUNTING, Role.CORPORATE_ACTIONS):
+        if topic == Topic.ACCOUNT_CLOSE and role in (Role.ACCOUNTING, Role.BROKER):
             previous = self._calendar.trading_dates[self._day_index - 1] if self._day_index > 0 else None
             if key not in (self._date, previous) or key is None:
                 raise PermissionError("only current or previous closing snapshot is visible")
-            if role == Role.CORPORATE_ACTIONS and key != previous:
-                raise PermissionError("corporate actions may only read the previous close")
+            if role == Role.BROKER and key != previous:
+                raise PermissionError("settlement may only read the previous close")
         elif key != self._date:
             raise PermissionError("only the exact current date is visible")
 
@@ -304,10 +296,6 @@ class RuntimeCache:
         elif topic == Topic.ACCOUNT_CLOSE:
             for name in ("positions", "equity_curve"):
                 self._archive(name, getattr(packet, name))
-        elif topic == Topic.ACCOUNT_ACTIONS:
-            if not packet.events.empty:
-                self._event_history.append(packet.events)
-                self._event_ids.update(packet.events.event_id)
         elif topic == Topic.EVALUATION_PREDICTION:
             self._audit["predictions"] = [packet.predictions]
             self._audit["rankic"] = [packet.rankic]
@@ -359,16 +347,6 @@ class RuntimeCache:
         elif topic == Topic.MARKET_CONTEXT:
             self._schema("universe", value.universe, ("code",))
             self._schema("barra", value.barra_exposures, ("date", "code"))
-        elif topic == Topic.REFERENCE_ACTIONS:
-            if value.status == "available":
-                self._schema("reference.actions", value.data, ACTION_COLUMNS)
-                if not value.data.effective_date.eq(day).all():
-                    raise ValueError("corporate actions must belong to the current day")
-                if not value.data.known_phase.isin((Phase.PRE_OPEN, Phase.CLOSE_VALUE)).all():
-                    raise ValueError("invalid corporate-action availability phase")
-                if ((value.data.known_date > day) |
-                    ((value.data.known_date == day) & (value.data.known_phase != Phase.PRE_OPEN))).any():
-                    raise ValueError("corporate action is not known at this open")
         elif topic == Topic.REFERENCE_BENCHMARK:
             if value.status == "available":
                 if not isinstance(value.data, BenchmarkDay) or value.data.date != day:
@@ -379,14 +357,10 @@ class RuntimeCache:
             self._dataset("barra", value.barra_exposures, ("date", "code"))
             self._dataset("benchmark_weights", value.benchmark_weights, ("date", "code", "benchmark_weight"))
             self._dataset("industries", value.industries, ("date", "code", "industry"))
-        elif topic == Topic.ACCOUNT_ACTIONS:
-            self._schema("account.events", value.events, EVENT_COLUMNS)
-            if not value.events.empty:
-                ids = value.events.event_id
-                if ids.isna().any() or ids.duplicated().any() or not self._event_ids.isdisjoint(ids):
-                    raise ValueError("corporate action event is missing, duplicated or already processed")
-                if not value.events.date.eq(day).all():
-                    raise ValueError("corporate action records must belong to the current day")
+            self._dataset("factor_covariance", value.factor_covariance,
+                          ("date", "factor1", "factor2", "covariance"))
+            self._dataset("specific_risk", value.specific_risk,
+                          ("date", "code", "specific_variance"))
         elif topic == Topic.ACCOUNT_OPEN:
             self._schema("open.values", value.values, VALUE_COLUMNS)
             _number(value.market_value, nonnegative=True)
@@ -508,21 +482,7 @@ class CacheView:
             if cache._scores is None:
                 cache._scores = _combine(cache._score_history, SCORE_COLUMNS)
             return cache._scores if date is None else cache._scores.loc[cache._scores.date == date]
-        elif topic in (Topic.ACCOUNT_CLOSE, Topic.ACCOUNT_ACTIONS):
-            if role != Role.CORPORATE_ACTIONS or cache._phase != Phase.PRE_OPEN:
-                raise PermissionError("account history is corporate-action-only before open")
-            if date is not None and date >= cache._date:
-                raise PermissionError("only past account history is visible")
-            if topic == Topic.ACCOUNT_CLOSE:
-                parts, columns = cache._audit["positions"], RESULT_COLUMNS["positions"]
-            else:
-                parts, columns = cache._event_history, EVENT_COLUMNS
-            parts = [frame.loc[frame.date < cache._date] for frame in parts]
-        else:
-            raise PermissionError("no history projection for this topic")
-        if date is not None:
-            parts = [frame.loc[frame.date == date] for frame in parts]
-        return _combine(parts, columns)
+        raise PermissionError("no history projection for this topic")
 
     def result_tables(self) -> dict[str, pd.DataFrame]:
         cache = self.__cache

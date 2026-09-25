@@ -1,0 +1,60 @@
+{
+  "kind": "single_run_smoke",
+  "command": ".venv/Scripts/python.exe -B examples/basic_usage.py",
+  "metrics": {
+    "annualized_excess_return": null,
+    "annualized_return": 0.02306279193353533,
+    "annualized_volatility": 0.18579482137608147,
+    "failed_orders": 1836,
+    "information_ratio": null,
+    "maximum_drawdown": 0.2800742070096849,
+    "mean_rankic": null,
+    "positive_rankic_ratio": null,
+    "rankic_ir": null,
+    "rankic_std": null,
+    "sharpe_ratio": 0.2161018345272336,
+    "total_return": 0.16659214241196607,
+    "tracking_error": null,
+    "transaction_cost": 0.0,
+    "turnover": 11.713368805446942
+  },
+  "performance": {
+    "data": {
+      "as_of_seconds": 1.7189248001523083,
+      "batches": 7,
+      "calendar_files": 84,
+      "calendar_seconds": 0.13201430000481196,
+      "close_rows": 803524,
+      "data_bytes": 158772790,
+      "data_files": 252,
+      "delivered_rows": {
+        "Barra_factor": 23851800,
+        "Factor33_winsor": 23851800,
+        "MarketData": 23851800
+      },
+      "market_seconds": 3.4335296997451223,
+      "open_rows": 803524,
+      "read_seconds": 3.5783986000024015,
+      "seed_files": 0,
+      "seed_rows": 0,
+      "source_rows": {
+        "Barra_factor": 510900,
+        "Factor33_winsor": 590238,
+        "MarketData": 590238
+      },
+      "wait_seconds": 0.21452650002902374,
+      "warmup_days": 0
+    },
+    "days_per_second": 83.44668419605001,
+    "elapsed_seconds": 20.408240499993553,
+    "inference_calls": 341,
+    "inference_seconds": 1.8579914999136236,
+    "inference_wait_seconds": 0.0009420999849680811,
+    "market_rows": 803524,
+    "playback_seconds": 19.057964899999206,
+    "source_rows_per_second": 82877.11035160205,
+    "trading_days": 1703
+  },
+  "basic_usage_sha256": "2f24a684bbf0a4b6a7945054751167dece9b822c79c87663586635eb1516bf5c",
+  "note": "Single run; bandwidth comparisons use data_flow.json medians."
+}

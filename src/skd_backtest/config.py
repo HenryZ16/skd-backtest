@@ -18,6 +18,11 @@ class OptimizerConfig:
     industry_exposure_limit: float | None = None
     barra_style_exposure_limit: float | None = None
     turnover_limit: float | None = None
+    risk_aversion: float = 1.0
+    barra_factors: tuple[str, ...] = (
+        "市值", "贝塔", "动量", "残差波动", "非线性市值",
+        "账面市值比", "流动性", "盈利", "成长", "杠杆",
+    )
 
 
 @dataclass(frozen=True)
@@ -51,7 +56,8 @@ class DataCapabilities:
     benchmark_returns: bool = False
     benchmark_weights: bool = False
     industries: bool = False
-    corporate_actions: bool = False
+    factor_covariance: bool = False
+    specific_risk: bool = False
 
 
 @dataclass(frozen=True)
@@ -59,7 +65,8 @@ class ReferenceSources:
     benchmark_returns: Path | None = None
     benchmark_weights: Path | None = None
     industries: Path | None = None
-    corporate_actions: Path | None = None
+    factor_covariance: Path | None = None
+    specific_risk: Path | None = None
 
     def __post_init__(self):
         for name in self.__dataclass_fields__:
@@ -84,9 +91,9 @@ class BacktestConfig:
     read_batch_months: int = 12
     prefetch: bool = True
     async_inference: bool = True
+    random_seed: int = 0
     benchmark_mode: Literal["none", "csi300"] = "none"
     label_price_basis: Literal["adjusted_open", "raw_open"] = "adjusted_open"
-    rights_policy: Literal["skip", "subscribe_available_cash"] = "skip"
     data_capabilities: DataCapabilities = field(default_factory=DataCapabilities)
     reference_sources: ReferenceSources = field(default_factory=ReferenceSources)
 
@@ -108,13 +115,14 @@ class BacktestConfig:
             raise ValueError("initial_cash must be finite and positive")
         if not isfinite(self.risk_free_rate) or self.risk_free_rate <= -1:
             raise ValueError("risk_free_rate must be finite and greater than -1")
+        if type(self.random_seed) is not int or not 0 <= self.random_seed < 2**32:
+            raise ValueError("random_seed must be an integer in [0, 2**32)")
         if not isinstance(self.async_inference, bool):
             raise TypeError("async_inference must be a boolean")
         for name, allowed in (
             ("price_mode", ("adjusted_return", "raw_price")),
             ("benchmark_mode", ("none", "csi300")),
             ("label_price_basis", ("adjusted_open", "raw_open")),
-            ("rights_policy", ("skip", "subscribe_available_cash")),
         ):
             if getattr(self, name) not in allowed:
                 raise ValueError(f"invalid {name}")
@@ -130,7 +138,7 @@ class BacktestConfig:
             if not (capabilities.raw_prices or capabilities.adjustment_factors):
                 raise NotImplementedError("raw_price requires raw OHLC/adjustment factors")
         if self.price_mode == "raw_price":
-            required += ["price_limits", "corporate_actions"]
+            required += ["price_limits"]
         if self.benchmark_mode == "csi300":
             required += ["benchmark_returns"]
         needs_weights = (optimizer.method != "top_k" or optimizer.active_weight_limit is not None
@@ -140,6 +148,8 @@ class BacktestConfig:
             if self.benchmark_mode == "none":
                 raise ValueError("benchmark-relative optimization requires benchmark_mode=csi300")
             required += ["benchmark_weights"]
+        if optimizer.method == "barra":
+            required += ["barra_exposures", "factor_covariance", "specific_risk"]
         if optimizer.industry_exposure_limit is not None:
             required += ["industries"]
         if optimizer.barra_style_exposure_limit is not None:

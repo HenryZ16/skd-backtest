@@ -6,11 +6,11 @@ from unittest.mock import patch
 import pandas as pd
 
 from skd_backtest.contracts import (
-    ActionResult, CloseSnapshot, CostQuote, CostRequest, ExecutionResult, OpenSnapshot,
+    CloseSnapshot, CostQuote, CostRequest, ExecutionResult, OpenSnapshot,
     PredictionResult, TargetPlan, Topic,
 )
 from skd_backtest.schemas import (
-    EVENT_COLUMNS, LABEL_COLUMNS, METRIC_NAMES, RESULT_COLUMNS, VALUE_COLUMNS, WEIGHT_COLUMNS, empty_result,
+    LABEL_COLUMNS, METRIC_NAMES, RESULT_COLUMNS, VALUE_COLUMNS, WEIGHT_COLUMNS, empty_result,
 )
 
 
@@ -18,17 +18,13 @@ from skd_backtest.schemas import (
 def protocol_components(engine, trace=None):
     trace = trace if trace is not None else []
 
-    def actions(*, date, cache):
-        trace.append(("actions", date))
+    def settle(*, date, cache):
+        trace.append(("settle", date))
         dates = cache.read(Topic.RUN_CALENDAR).trading_dates
         index = dates.index(date)
         state = (cache.read(Topic.ACCOUNT_CLOSE, dates[index - 1]).account if index
                  else cache.read(Topic.ACCOUNT_INITIAL).account)
-        cache.publish(Topic.ACCOUNT_ACTIONS, date, ActionResult(date, state, pd.DataFrame(columns=EVENT_COLUMNS)))
-
-    def settle(*, date, cache):
-        trace.append(("settle", date))
-        cache.publish(Topic.ACCOUNT_SETTLED, date, cache.read(Topic.ACCOUNT_ACTIONS, date).account)
+        cache.publish(Topic.ACCOUNT_SETTLED, date, state)
 
     def open_mark(*, date, market, cache):
         trace.append(("open", date))
@@ -104,7 +100,7 @@ def protocol_components(engine, trace=None):
 
     with ExitStack() as stack:
         for component, method, function in (
-            (engine.corporate_actions, "apply", actions), (engine.broker, "start_day", settle),
+            (engine.broker, "start_day", settle),
             (engine.accounting, "mark_at_open", open_mark), (engine.broker, "execute", execute),
             (engine.cost_model, "calculate", cost), (engine.accounting, "mark_to_market", close_mark),
             (engine.optimizer, "optimize", optimize), (engine.label_provider, "build", labels),

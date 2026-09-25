@@ -2,7 +2,7 @@
 
 本文是组件间接口的独立设计依据，需求以 [只读开发规格](../BACKTEST_PLATFORM_SPEC_v2.md) 为准；现有实现状态见 [实现设计与开发](design.md)。
 
-**状态：缓存层与公共接口已落地，协议版本 1。** 本文定义组件应遵循的共享数据结构、读写权限、入口和时序；共享类型、缓存、配置、Engine 接线、Runner 校验及运行日志已实现。下文的金融语义是各组件后续实现的责任；当前金融组件按固定入口和缓存协议保留可运行的占位实现，engine.run() 可以完成全流程。占位实现保留分数、传递未变账户，发布空目标/成交/标签及 None 指标，并记录 STUB；每日收盘交接行的 NAV、收益等未计算字段也为 None。最终 JSON/CSV 尚未输出，指定目录时目前只写 run.log。这些占位值不表示金融算法已完成。
+**状态：公共接口协议版本 3，标准提交与正式优化器已接入。** 缓存、异步推理、组合构建、交易、费用、估值、外部参考数据、标签、评价及文件输出共用本文协议。实现与验收范围见实现设计文档。
 
 ## 1. 交互边界
 
@@ -11,7 +11,7 @@
 新增单次回测内的内存缓存 `RuntimeCache`，承载市场数据流以外的共享数据：
 
 - 账户阶段快照、实际权重和收盘基准；
-- 当前成分、Barra 暴露、指数权重、行业、基准收益和公司行为；
+- 当前成分、Barra 暴露、指数权重、行业和基准收益；
 - 模型分数、下一执行日目标、订单、成交与每日核算结果；
 - 计费请求与结果；
 - 事后标签、预测评价、最终指标及结构化运行记录。
@@ -36,7 +36,6 @@ flowchart LR
     O[Optimizer] <--> C
     B <--> C
     A <--> C
-    CA[Corporate Actions] <--> C
     F[Cost Model] <--> C
     L[Label Provider] <--> C
     P[Prediction Evaluator] <--> C
@@ -107,8 +106,8 @@ class CacheView:
 - `publish()` 验证角色、阶段、键及关联日期后，直接保存数据包引用，不递归克隆。每种固定表结构只在本次运行首次出现时验证一次；同一账户表、股票池或 Barra 表在后续阶段复用时不再检查结构。失败时该包不生效。
 - 同一主题、同一键只允许发布一次。发布成功即交出修改权，生产者和读者都不得再原地修改该包及嵌套的 DataFrame、dict、对象单元格；`read()` 返回原对象的借用引用。新阶段只为确实改变的表或字段建立新对象，未变部分共享。
 - `read()` 对未发布的必需键抛出 `KeyError`，权限错误抛出 `PermissionError`，字段或关联错误抛出 `ValueError`，数据包类型错误抛出 `TypeError`，非法阶段和重复发布抛出 `RuntimeError`；不等待、不自动重试。
-- 缓存负责协议交接及一次性表结构检查，不重复逐表扫描主键、空值和行日期。主键唯一、行日期正确、账户平衡及费用计算由唯一生产者保证；Runner 在本次运行首个信号日检查模型输出结构，每批仍验证分数值、日期和股票池覆盖。缓存保留阶段/权限、数据包日期、执行排期、计费身份、事件可见时点与跨日去重等会随运行改变的检查。首次校验后，生产者必须维持固定结构；缓存不再主动检测后续结构漂移。
-- `history()` 仅开放三种历史投影：`signal.scores` 的分数表、`account.close` 的 positions 表、`account.actions` 的事件处理表。可用 date 筛选确切业务日期；不传 date 时返回该角色当前允许的全部历史。公司行为组件仅可读截至上一收盘的持仓和既往事件；Label Provider、Evaluator 仅在 EVALUATION 阶段可读分数历史。其他主题不得使用此接口。
+- 缓存负责协议交接及一次性表结构检查，不重复逐表扫描主键、空值和行日期。主键唯一、行日期正确、账户平衡及费用计算由唯一生产者保证；Runner 在本次运行首个信号日检查模型输出结构，每批仍验证分数值、日期和股票池覆盖。缓存保留阶段/权限、数据包日期、执行排期、计费身份等会随运行改变的检查。首次校验后，生产者必须维持固定结构；缓存不再主动检测后续结构漂移。
+- `history()` 仅开放 `signal.scores` 的分数历史，Label Provider 与 Evaluator 只能在 EVALUATION 阶段读取，可按信号日期筛选。其他主题不提供历史查询。
 - `result_tables()` 在评价结果完成后开放给 Metrics、Result Writer 和 Engine；七张表首次读取时合并一次，后续共享同一结果映射及表引用，不暴露计费过程或外部原始数据。完整分数历史也只合并一次；按日期筛选及多块拼接仍可能分配新表，不承诺所有 pandas 操作零拷贝。
 - `finish_quote()` 仅 Broker 可调用，必须对应当前已完成报价的请求；接受或放弃报价后调用，一次回收请求和结果。未完成回收时不能发布下一请求；缓存保留当日请求序号水位，防止复用已回收的 ID。
 - `log()` 是所有角色共有的追加接口，缓存自动补充逻辑序号、日期、阶段和组件名。不得通过日志传递业务数据；消费者不能依赖日志计算结果。`log_records()` 仅 Writer 可读，在任意阶段及 FAILED 中返回序号严格大于 after_seq 的只读记录引用列表。log() 仅在写入时复制小型 details 字典，防止调用者随后修改日志内容；读取不再克隆记录。
@@ -116,7 +115,7 @@ class CacheView:
 
 `LogRecord` 字段为 `seq:int, date:str|None, phase:Phase, component:ComponentRole, level:str, message:str, details:dict`；seq 从 1 递增，level 为 DEBUG/INFO/WARNING/ERROR。日志刷盘游标由 Writer 独占维护，写入成功后才推进。
 
-`ComponentRole` 固定为 engine、reference_data、corporate_actions、broker、accounting、runner、optimizer、cost_model、label_provider、evaluator、metrics、writer；缓存初始化行为属于基础设施内部，不开放可由业务组件申领的额外角色。
+`ComponentRole` 固定为 engine、reference_data、broker、accounting、runner、optimizer、cost_model、label_provider、evaluator、metrics、writer；缓存初始化行为属于基础设施内部，不开放可由业务组件申领的额外角色。
 
 ### 生命周期与保留范围
 
@@ -124,7 +123,7 @@ class CacheView:
 
 ```text
 INITIALIZE
-→ [PRE_OPEN → OPEN_VALUE → EXECUTION → CLOSE_VALUE → SIGNAL?] × 交易日
+→ [SETTLEMENT → OPEN_VALUE → EXECUTION → CLOSE_VALUE → SIGNAL?] × 交易日
 → EVALUATION → METRICS → OUTPUT → CLOSED
 ```
 
@@ -140,7 +139,6 @@ INITIALIZE
 | 下一执行日目标 | 从信号日发布至该执行日完成；过期不得顺延重试 |
 | 当前计费请求和结果 | 最多一个未消费请求；Broker 接受或放弃后调用 finish_quote 成对回收 |
 | 审计历史 | 保留目标、订单、成交、持仓、净值的非空表及分数表引用，按块累积；合并时取得输出列 |
-| 公司行为处理记录 | 只保存非空事件表及已处理事件 ID 集合；新增事件增量去重，不回扫历史表 |
 | 标签和预测评价 | 仅事后阶段创建，运行结束输出完成后释放 |
 | 运行记录 | 按序追加；Result Writer 按序号增量读取，结束后释放 |
 
@@ -158,16 +156,14 @@ INITIALIZE
 |---|---|---|---|---|---|
 | `run.context` | None | RunContext | Engine 初始化缓存 | 全部平台组件 | INITIALIZE |
 | `run.calendar` | None | RunCalendar | Engine 从 DataProvider.prepare 取得 | 全部平台组件 | INITIALIZE |
-| `account.initial` | None | InitialAccount | 缓存按运行参数初始化 | Corporate Actions、Accounting | INITIALIZE |
+| `account.initial` | None | InitialAccount | 缓存按运行参数初始化 | Broker、Accounting | INITIALIZE |
 | `market.context` | 信号日 | 当日成分和 Barra 暴露 | Engine 从现有数据流桥接 | Reference Data | SIGNAL |
-| `reference.actions` | 当日 | Dataset[公司行为表] | Reference Data | Corporate Actions | PRE_OPEN |
 | `reference.benchmark` | 当日 | Dataset[BenchmarkDay] | Reference Data | Accounting | CLOSE_VALUE |
 | `reference.portfolio` | 信号日 | PortfolioInputs | Reference Data | Runner、Optimizer | SIGNAL |
-| `account.actions` | 当日 | ActionResult | Corporate Actions | Broker | PRE_OPEN |
-| `account.settled` | 当日 | AccountState | Broker | Accounting | PRE_OPEN |
+| `account.settled` | 当日 | AccountState | Broker | Accounting | SETTLEMENT |
 | `account.open` | 当日 | OpenSnapshot | Accounting | Broker、Accounting | OPEN_VALUE |
 | `execution.day` | 当日 | ExecutionResult | Broker | Accounting | EXECUTION |
-| `account.close` | 当日 | CloseSnapshot | Accounting | Corporate Actions、Accounting、Optimizer | CLOSE_VALUE |
+| `account.close` | 当日 | CloseSnapshot | Accounting | Broker、Accounting、Optimizer | CLOSE_VALUE |
 | `signal.scores` | 信号日 | Scores | Runner | Optimizer、Label Provider、Evaluator | SIGNAL |
 | `signal.targets` | 执行日 | TargetPlan | Optimizer | Broker | SIGNAL |
 | `cost.request` | 当日、请求 ID | CostRequest | Broker | Cost Model | EXECUTION |
@@ -179,7 +175,7 @@ INITIALIZE
 
 具体读取范围：
 
-- Corporate Actions 读取当日事件、上日 `account.close` 的账户部分和截至上日的持仓审计投影；首日读取 `account.initial`。
+- Broker 日初直接读取上一交易日 `account.close` 的账户，首日读取 `account.initial`，解锁到期持仓后发布 `account.settled`。
 - Accounting 开盘只读取当日 `account.settled`；收盘读取当日 `execution.day`、当日 `account.open` 的交易前权益、上日 `account.close` 的收益基准和当日 `reference.benchmark`；首日基准来自 `account.initial`。
 - Optimizer 只读取同一信号日的分数、参考输入及收盘实际权重，不能读事后标签或未来日期的快照。
 - Broker 只读取当日开盘快照和 `execution_date=当日` 的目标；不读取收盘快照、基准当日收益或标签。
@@ -198,18 +194,18 @@ INITIALIZE
 | `price_mode` | `adjusted_return` 或 `raw_price`，全程固定 |
 | `benchmark_mode` | `none` 或 `csi300`；当前缺少基准数据时用 none，不能冒充指数增强完整评测 |
 | `label_price_basis` | `adjusted_open` 或 `raw_open`；默认 adjusted_open，各队伍必须统一 |
-| `rights_policy` | `skip` 或 `subscribe_available_cash`；默认 skip，各队伍统一 |
-| `data_capabilities` | 真实价格/复权因子、限价、停牌、基准收益、基准权重、行业、公司行为等数据源的可用性 |
-| `reference_sources` | 基准收益、权重、行业、公司行为的可选输入路径；源文件适配由 Reference Data 独占 |
+| `data_capabilities` | 真实价格/复权因子、限价、停牌、基准收益、基准权重、行业等数据源的可用性 |
+| `reference_sources` | 基准收益、权重、行业及风险参数的可选输入路径；源文件适配由 Reference Data 独占 |
 | `backtest.prefetch` | 默认 True，控制下一批行情读取预取 |
 | `backtest.async_inference` | 默认 True，独立控制顺序推理线程；False 在 SIGNAL 同步调用 |
+| `backtest.random_seed` | 默认 0，模型加载和推理的 Python/NumPy 传统随机流种子 |
 | `protocol_version` | 固定接口版本，随输出运行记录保存 |
 
 `RunCalendar` 的确切字段为 `trading_dates: tuple[str, ...]` 和 `signal_calendar: DataFrame[signal_date, execution_date]`；由实际交易日序列和 rebalance_interval 生成，执行日必须是区间内下一交易日。Engine 读取 DataProvider.prepare 的结果后一次发布，逐日阶段开始前必须存在；金融组件不能修改日历。
 
-配置字段已集中定义在 `config.py`，组件实现者只读，不各自修改共享配置类。DataCapabilities 的固定字段为 adjusted_prices、raw_prices、adjustment_factors、price_limits、suspension、constituents、barra_exposures、benchmark_returns、benchmark_weights、industries、corporate_actions；ReferenceSources 的字段为 benchmark_returns、benchmark_weights、industries、corporate_actions，值为 Path 或 None。数据能力声明不等于适配器已实现。具体数据文件的内部读取方法不属于组件间协议；生产者必须输出第 7 节的标准结构。
+配置字段已集中定义在 `config.py`，组件实现者只读，不各自修改共享配置类。DataCapabilities 的固定字段为 adjusted_prices、raw_prices、adjustment_factors、price_limits、suspension、constituents、barra_exposures、benchmark_returns、benchmark_weights、industries、factor_covariance、specific_risk；ReferenceSources 的字段为 benchmark_returns、benchmark_weights、industries、factor_covariance、specific_risk，值为 Path 或 None。数据能力声明不等于适配器已实现。具体数据文件的内部读取方法不属于组件间协议；生产者必须输出第 7 节的标准结构。
 
-运行前必须校验所选模式及算法的数据能力。真实价格模式需要真实 OHLC 或可恢复真实价格的复权因子、停牌状态、PIT 限价及公司行为覆盖；相关数据不能由后复权价格或固定涨跌停比例假造。未准备齐全时保持当前明确拒绝 raw_price 的行为。
+运行前必须校验所选模式及算法的数据能力。真实价格模式需要真实 OHLC 或可恢复真实价格的复权因子、停牌状态和 PIT 限价；相关数据不能由后复权价格或固定涨跌停比例假造。未准备齐全时保持当前明确拒绝 raw_price 的行为。
 
 `benchmark_mode=none` 时，基准及依赖基准的绩效字段为空，但组合自身指标可计算；benchmark tilt、主动权重约束及需要真实基准的正式优化不能启用。`csi300` 时必须有真实历史基准收益，启用基准组合构建时还必须有历史权重。行业或风险约束缺少必需输入时直接报错，不静默忽略约束。
 
@@ -234,7 +230,7 @@ locked_lots
 | adjusted_return | `code, position_value, reference_price, reference_date` |
 
 - raw_price 的 `reference_price` 是历史可得真实价格参考；adjusted_return 的参考价是与 `position_value` 对应的复权估值价格。
-- `locked_lots` 在 raw_price 下为 `code, shares, unlock_date, reason`，用于 T+1 与公司行为新增股份的可卖日期；在 adjusted_return 下为空表，不声称模拟真实股数 T+1。普通买入若已在区间最后一个交易日，unlock_date 允许为空，表示本次运行不再解锁，不能因此增加可卖股数；公司行为要求的 sellable_date 仍必须由事件提供。
+- `locked_lots` 在 raw_price 下为 `code, shares, unlock_date, reason`，用于 T+1 可卖日期；在 adjusted_return 下为空表，不声称模拟真实股数 T+1。普通买入若已在区间最后一个交易日，unlock_date 允许为空，表示本次运行不再解锁，不能因此增加可卖股数。
 - raw_price 必须满足 `total_shares = sellable_shares + 尚未解锁股数`，均不得为负。买入只增加总股数及下一交易日解锁记录；Broker 日初按日期解锁，不能直接无条件令所有股数可卖。
 - adjusted_return 的持仓以实际资产金额记录。Accounting 用同一复权价格体系更新价值和参考价，Broker 调整实际资产金额及现金；不能用复权价虚构真实股数。
 - 无融资和杠杆，现金始终非负。全部持仓都必须保留至真实成交或明确资产处理，不能因调出指数或缺失行情删除。
@@ -245,16 +241,13 @@ locked_lots
 | 数据包 | 确切字段 |
 |---|---|
 | InitialAccount | `account: AccountState, portfolio_value: float, portfolio_nav: float, benchmark_nav: Optional[float]` |
-| ActionResult | `date: str, account: AccountState, events: DataFrame` |
 | OpenSnapshot | `date: str, account: AccountState, values: DataFrame, market_value: float, portfolio_value: float` |
 | ExecutionResult | `date: str, account: AccountState, orders: DataFrame, trades: DataFrame, trade_value: float, total_cost: float, executed_signal_date: Optional[str]` |
 | CloseSnapshot | `date: str, account: AccountState, positions: DataFrame, equity_curve: DataFrame, actual_weights: DataFrame` |
 
-InitialAccount 的 portfolio_value=initial_cash、portfolio_nav=1；基准启用时 benchmark_nav=1，否则为空。ActionResult 无事件或复权模式也发布有效账户。OpenSnapshot.values 为 `code, price, price_date, market_value`，其 market_value 合计必须等于快照总市值。
+InitialAccount 的 portfolio_value=initial_cash、portfolio_nav=1；基准启用时 benchmark_nav=1，否则为空。OpenSnapshot.values 为 `code, price, price_date, market_value`，其 market_value 合计必须等于快照总市值。
 
 ExecutionResult.trade_value、total_cost 必须分别等于其实际 trades 对应字段之和；无成交为 0。CloseSnapshot.equity_curve 必须恰好一行，下一日收益基准直接读取该行的 portfolio_value、portfolio_nav 和 benchmark_nav，不维护另一份可变的“上一收盘”变量。
-
-事件处理表为 `event_id, date, code, record_shares, cash_delta, shares_delta, status, reason`；status 为 APPLIED 或 SKIPPED，reason 在跳过时必填。Corporate Actions 读取既往事件投影去重；相同 event_id 不得再次入账或产生第二条最终处理记录。
 
 `actual_weights` 为 `code, weight`，来自全部实际持仓的收盘市值除以当日组合权益；不以目标权重替代。它不包含现金行，股票权重和允许小于 1。
 
@@ -262,9 +255,7 @@ ExecutionResult.trade_value、total_cost 必须分别等于其实际 trades 对�
 
 raw_price 的逐股市值按真实股数与真实估值价格计算。adjusted_return 使用持仓对应的参考复权价格推进价值；Broker 新增的资产金额以本日开盘基准计入，再由 Accounting 在收盘推进。两种模式的估值不能交叉使用参考价。
 
-公司行为后若股数或价格基准变化，Corporate Actions 负责同时更新账户中的历史估值参考；无有效开盘时，Accounting 必须使用调整后的账户参考价，不能重新采用除权前的未调整参考价导致市值虚增。无法确定一致参考价时显式失败。
-
-各组件借用输入，不修改已经发布的对象。更新现金等标量时构造新的 AccountState 并共享未变表；需要改变持仓或锁定批次时，只复制并更新相应表，再发布下一阶段包。Accounting 不修改交易结果，Broker 不修改估值快照，Corporate Actions 不修改上日账户。
+各组件借用输入，不修改已经发布的对象。更新现金等标量时构造新的 AccountState 并共享未变表；需要改变持仓或锁定批次时，只复制并更新相应表，再发布下一阶段包。Accounting 不修改交易结果，Broker 不修改估值快照。
 
 ## 7. 外部参考数据与信号数据
 
@@ -286,11 +277,30 @@ universe: DataFrame[code]
 barra_exposures: Dataset[DataFrame[date, code, 各 Barra 暴露列]]
 benchmark_weights: Dataset[DataFrame[date, code, benchmark_weight]]
 industries: Dataset[DataFrame[date, code, industry]]
+factor_covariance: Dataset[DataFrame[date, factor1, factor2, covariance]]
+specific_risk: Dataset[DataFrame[date, code, specific_variance]]
 ```
 
 Barra 暴露列沿用源表的因子名称，只将日期和代码规范为 date/code。行业和权重必须是信号时点已知的历史版本，不能使用未来调整公告或当期之外的成分。
 
 合法股票池只由该信号日成分确定。基准权重、行业和暴露按 code 对齐；需使用的数据若缺失个股，不静默补等权、零暴露或未知行业。
+
+外部来源由 ReferenceSources 指定单个 CSV 或 Parquet 文件，列名分别为：
+
+| 来源 | 必需列 |
+|---|---|
+| benchmark_returns | date、benchmark_return |
+| benchmark_weights | date、code、benchmark_weight |
+| industries | date、code、industry |
+| factor_covariance | date、factor1、factor2、covariance |
+| specific_risk | date、code、specific_variance |
+
+外部日期统一为 YYYY-MM-DD，代码保留市场前缀。来源按精确日期取截面，不向前填充或推测历史版本；权重为非负有限小数，每日合法池内权重合计为 1。声明了来源但缺少必需日期、个股或字段时直接报错。
+
+外部文件第一次使用时读取并校验一次，保留本次运行的只读源表及日期索引；每日仅选择所需截面。ReferenceDataProvider.close() 释放这些资源，Engine 在成功和失败时均调用，重复 run 必须重新读取来源文件。该读取状态属于来源资源管理，不保存或替代缓存中的账户及组件产物。
+
+风险参数同样必须在信号时点已知。正式优化器用配置的 Barra 暴露 X、完整因子协方差 F 与非负特异方差 D 组成 XFXᵀ+diag(D)。
+协方差要求对称、半正定，数据使用相同收益周期与单位。风险参数缺失不能填零；简单优化方法不依赖风险数据。
 
 ### 7.3 BenchmarkDay
 
@@ -303,27 +313,7 @@ benchmark_return
 
 当日基准收益到 CLOSE_VALUE 才发布。它与信号日的成分权重不同，不根据当前目标组合、实际持仓或简单等权股票收益代替。
 
-### 7.4 CorporateActionEvent
-
-事件表主键为 event_id，必需字段：
-
-```text
-event_id, code, action, known_date, known_phase, effective_date, record_date,
-cash_per_share, share_ratio, subscription_price, sellable_date,
-reference_price_after_action
-```
-
-- action 为 CASH_DIVIDEND、BONUS、SPLIT 或 RIGHTS；不适用字段为空。
-- known_date 为日期，known_phase 为 PRE_OPEN 或 CLOSE_VALUE，同日 PRE_OPEN 早于 CLOSE_VALUE；两个标量字段表示信息最早可用阶段，必须不晚于处理阶段。源数据只有日期而无盘前可得证明时，按该日 CLOSE_VALUE 处理。effective_date 是本事件实际账户处理日。若原始事件的除权、派息、到账日不同，由数据适配器输出相应独立处理记录，不能混为同一天。
-- CASH_DIVIDEND、BONUS、RIGHTS 的 record_date 用于股权登记数量，必须早于盘前处理日；不能无条件以派息/到账日当前股数计算权益。Corporate Actions 从缓存持仓历史取得登记日的实际持股；回测开始前没有持仓的登记日权益为零。SPLIT 使用处理前实际股数，record_date 可空。
-- cash_per_share 为统一口径的每登记股现金入账额；share_ratio 的语义随 action 固定：BONUS 为每登记股新增比例，SPLIT 为拆并后与拆并前总股数的比例，RIGHTS 为每登记股可认购比例。
-- subscription_price 为配股认购价，sellable_date 为新增股份可卖日；需要这两个字段的事件缺失它们时失败，不能自行推断。
-- reference_price_after_action 是可选的、处理时点已知的真实价格参考；若源数据未提供，则只能按明确事件条款变换原参考价。未知参考价不能用未来行情补齐。
-- RIGHTS 按 RunContext.rights_policy 处理；现金受限时按固定代码顺序处理，并保留认购或放弃记录。
-- 真实价格模式的事件处理记录以 event_id 增量去重，至少包含处理日、代码、登记股数、现金变化、股数变化和是否跳过，作为缓存审计投影及 run.log 内容。空事件日不保留历史空表；去重仅查看当批事件及已处理 ID 集合，不重放历史。
-- adjusted_return 不加载或回放公司行为数据，Reference Data 发布说明该模式无需事件源的 unavailable 数据包；Corporate Actions 原样传递账户引用并发布空事件表，不逐事件生成跳过记录。保留该阶段只是为了统一账户交接顺序，公司行为收益已包含在复权价格中。
-
-### 7.5 Scores 与 TargetPlan
+### 7.4 Scores 与 TargetPlan
 
 Scores 为 `date, code, score` 固定结构表；每只合法股票必须且只能出现一次，date 等于信号日，score 有限。结构在首个信号日验证一次；每批分数值和股票池校验由 Runner 完成后才发布，错误时不发布部分分数。
 
@@ -344,6 +334,11 @@ weights: DataFrame[
 - 未排期目标与空目标不同：无该 execution_date 的键表示不调仓；已发布空 weights 表表示明确清空股票目标，Broker 仍需处理现有持仓。
 - 每个目标只在指定下一开盘执行一次；失败订单不自动重试到其他交易日。Actual Portfolio 可以持续偏离 Target Portfolio。
 - Top-K、benchmark tilt 和正式优化器共用上述输入输出协议；替换优化算法不得要求修改 Broker、Accounting 或 Metrics。
+
+正式 method=barra 的目标为排名百分位减 0.5 得到的 alpha 收益减基准主动风险惩罚；risk_aversion 为正。
+单股上限约束 w，主动上限约束 abs(w-b)，行业/风格上限约束对应主动暴露，换手限制为 sum(abs(w-current))，含退池归零。
+满仓时 sum(w)=1，否则 sum(w)<=1；均不允许负权重。精确中性约束去除线性重复后求解，不可行或求解失败不发布目标。
+高级约束仅用于正式方法，简单方法不静默忽略。具体参数、求解容差与风险输入格式见使用说明。
 
 ## 8. Broker 与 Cost Model 的缓存交换
 
@@ -379,6 +374,7 @@ commission, stamp_tax, other_cost, total_cost, cash_delta
 - raw_price 下 execution_price 为 base_price 应用方向滑点后的真实成交价，trade_value 为 shares × execution_price；position_value 为 shares × base_price。
 - adjusted_return 下 execution_price=None；position_value 保持请求的资产金额，trade_value 为该金额应用买卖方向滑点后的现金对价。它不声称产生真实股数成交。
 - 佣金、最低佣金、卖出印花税、过户费由 Cost Model 按交易日费率独立计算；total_cost 为三项显式费用之和。滑点已进入 trade_value，不再重复加到 total_cost。
+- fee_schedule 生效日期严格递增，使用不晚于交易日的最后一条费率。空表表示显式零税费配置；非空表未覆盖该交易日则报错，不内置或猜测历史费率。
 - BUY 的 cash_delta 为 -(trade_value + total_cost)，SELL 为 trade_value - total_cost。
 - CostQuote 只报价，不入账。Broker 检查日期、请求/订单 ID、方向和模式一致后，才可接受并更新本地账户。
 - 买单因现金不足缩量后必须重新请求计费，不按比例缩放包含最低佣金的旧报价；每次修订必须严格减少数量/金额。Broker 负责有限次收敛并拒绝无法买入的订单。
@@ -404,11 +400,10 @@ Broker 完成所有卖单、更新本地真实现金后才处理买单；全部�
 |---|---|---|
 | DataProvider | `prepare() -> list[str]` | 准备真实交易日历及播放状态，返回区间内实际日期 |
 | DataProvider | `playback() -> Iterator[DailyData]` | 保持独立市场流；不依赖运行缓存 |
-| Reference Data | `prepare_open(*, date, cache)` | 仅 raw_price 加载当日公司行为；adjusted_return 发布无需事件源的说明 |
 | Reference Data | `prepare_close(*, date, cache)` | 发布 reference.benchmark |
 | Reference Data | `prepare_signal(*, date, cache)` | 读取 market.context，发布 reference.portfolio |
-| Corporate Actions | `apply(*, date, cache)` | 事件、前收盘账户 → account.actions |
-| Broker | `start_day(*, date, cache)` | 公司行为后账户 → T+1 解锁 → account.settled |
+| Reference Data | `close()` | 释放本次运行的外部源表和索引 |
+| Broker | `start_day(*, date, cache)` | 上一收盘账户或初始账户 → 日初解锁账户 |
 | Accounting | `mark_at_open(*, date, market, cache)` | 日初账户及开盘行情 → account.open |
 | Broker | `execute(*, date, market, cache) -> Iterator[int]` | 开盘账户、目标、计费交换 → execution.day |
 | Cost Model | `calculate(*, date, request_id, cache)` | cost.request → cost.result |
@@ -430,26 +425,28 @@ Broker 完成所有卖单、更新本地真实现金后才处理买单；全部�
 | 类 | 构造参数 |
 |---|---|
 | DataProvider | `config: BacktestConfig, *, load_research: bool = True` |
-| ReferenceDataProvider、LabelProvider、CorporateActionEngine、Broker、PortfolioAccounting | `config: BacktestConfig` |
-| SubmissionRunner | `inference: Callable` |
+| ReferenceDataProvider、LabelProvider、Broker、PortfolioAccounting | `config: BacktestConfig` |
+| SubmissionRunner | `inference: Callable, random_seed: int = 0`；或 `from_submission(submission_dir, random_seed=0)` |
 | PortfolioOptimizer | `config: OptimizerConfig` |
 | CostModel | `config: CostConfig` |
 | PredictionEvaluator | 无参数 |
 | Metrics | `trading_days_per_year: int, risk_free_rate: float` |
 | ResultWriter | `output_dir: Path \| None` |
 
-运行状态放入缓存或单次调用的局部变量；构造参数为只读配置。推理线程池、停止标记和有界日包队列由单次 inference_days 生成器持有，结束时回收。Broker 的生成器局部变量在本次调用结束时释放，Writer 的日志句柄和游标由 open/close 管理。构造函数不读取外部文件、不开始行情播放，使启动失败由统一运行生命周期处理。
+账户运行状态放入缓存或单次调用的局部变量；构造参数为只读配置。Runner 独占参赛模型和私有随机状态。推理线程池、停止标记和有界日包队列由单次 inference_days 生成器持有，结束时回收。Broker 的生成器局部变量在本次调用结束时释放，Writer 的日志句柄和游标由 open/close 管理。金融组件构造函数不读取外部数据、不开始行情播放。标准提交加载入口会执行 inference.py 并初始化模型，加载失败直接抛出。
+标准路径每次评测仅创建一个模型，重复 run 创建新实例；callable 路径内部状态由调用者管理。
+Runner 控制 Python/NumPy 传统随机源并恢复宿主状态，额外随机生成器/第三方非确定算法遵守提交可复现约定。
 
 DataProvider.playback 已复用同一次 prepare 结果；独立调用 playback 时自动 prepare，关闭后下次播放重新准备。Engine 不为取得日历重复启动行情读取。
 
-Accounting.current_weights 的组件间调用取消，其产物并入 CloseSnapshot.actual_weights。Broker.initialize 的共享账户初始化职责迁入缓存初始状态构造。DataProvider.future_returns 和 corporate_actions 的非市场数据职责分别迁入 Label Provider 与 Reference Data，金融组件不再调用 DataProvider 的这些方法。
+Accounting 的实际权重通过 CloseSnapshot.actual_weights 发布；初始账户由缓存建立，Broker 日初直接读取初始或上一收盘账户。Label Provider 独立读取事后价格，金融组件不通过正在播放的市场流取得未来收益。
 
 ## 10. 逐日时序及失败行为
 
 | 阶段 | Engine 的固定调用顺序 |
 |---|---|
 | INITIALIZE | 建立配置和缓存初始账户 → Result Writer.open → 校验数据能力 → DataProvider.prepare → 发布 run.calendar；日历读取失败也进入统一失败日志 |
-| PRE_OPEN | Reference Data.prepare_open → Corporate Actions.apply → Broker.start_day |
+| SETTLEMENT | Broker.start_day：直接读取上一收盘账户（首日为初始账户），执行到期持仓解锁 |
 | OPEN_VALUE | Accounting.mark_at_open，只传当日开盘行情 |
 | EXECUTION | Broker.execute；每次让出后调用 Cost Model.calculate；没有目标也完成当日 ExecutionResult |
 | CLOSE_VALUE | Reference Data.prepare_close → Accounting.mark_to_market，只传当日收盘行情 |
@@ -459,7 +456,7 @@ Accounting.current_weights 的组件间调用取消，其产物并入 CloseSnaps
 | METRICS | Metrics.calculate |
 | OUTPUT | Result Writer.write → Engine 接收最终输出对象 → 刷新日志并关闭 Writer、缓存及数据资源 |
 
-第一日无历史持仓，使用初始账户；非调仓日仍在真实价格模式处理当日公司行为，并执行解锁、开盘估值、收盘核算；末日不生成无区间内执行日的目标。无交易日区间跳过日循环，仍输出完整字段的空审计表与定义明确的指标。
+第一日无历史持仓，使用初始账户；非调仓日仍执行日初解锁、开盘估值和收盘核算；末日不生成无区间内执行日的目标。无交易日区间跳过日循环，仍输出完整字段的空审计表与定义明确的指标。
 
 Engine 在依赖点观察到组件失败后，立即停止后续决策，记录异常组件、日期、阶段及原因，关闭 Broker 生成器、推理和读取资源，并在 finally 中关闭日志与缓存。未来日期推理异常在对应 SIGNAL 阶段传播；后台不再调用排队的后续模型。取消未启动任务后等待正在运行的用户回调返回，线程不能强制终止回调。失败不触发静默重试，不发布成功 output.receipt。最终文件输出时先写入本次运行独占目录中的临时文件，七张 CSV 全部成功后才发布 metrics.json 作为完成标记；输出途中失败不得留下正式 metrics.json。已写 CSV 和 run.log 可用于排错，不能作为成功结果读取。缓存只保证单个数据包发布完整，整次运行的外部文件成功状态以该完成标记及 receipt 为准。
 
@@ -534,7 +531,9 @@ CloseSnapshot 每交易日必须有一行 equity_curve；positions 按实际非�
 - 15 个指标名称沿用现有 METRIC_NAMES；标准差采用样本标准差 ddof=1，年化使用 trading_days_per_year；无风险利率是年化小数。
 - RankICIR 不年化；RankIC 汇总只使用有效 RankIC 日，正值比例的分母也为有效日数。
 - Total Return 从初始 NAV=1 到期末计算；最大回撤的历史序列包含初始 NAV=1，不能漏掉第一日亏损。
-- Annualized Excess Return 采用组合年化收益减基准年化收益；TE/IR 按需求的 active_return 序列计算。
+- 设 n 为回测交易日数（包括未成交日），Y 为 trading_days_per_year；Annualized Return 为期末 NAV^(Y/n)-1，Annualized Excess Return 为组合年化收益减基准年化收益。
+- Annualized Volatility 为日收益样本标准差 × sqrt(Y)；TE 为 active_return 样本标准差 × sqrt(Y)，IR 为 active_return 均值 / 样本标准差 × sqrt(Y)。
+- Sharpe 使用按 (1+risk_free_rate)^(1/Y)-1 换算的日无风险收益，日超额收益均值 / 日收益样本标准差 × sqrt(Y)。有效样本的波动率可以为 0，作为比率分母的零或浮点近零标准差则使比率未定义。
 - 无足够样本或零方差使指标未定义时返回 None；benchmark_mode=none 时基准相关指标为 None。无交易日区间的收益、风险、RankIC 指标为 None，交易次数/换手/费用合计为 0。
 - Metrics 不读取原始价格、不修改核算结果，不内置最终排行榜权重。
 
@@ -547,9 +546,9 @@ annualized_volatility, maximum_drawdown, tracking_error,
 information_ratio, sharpe_ratio, turnover, transaction_cost, failed_orders
 ```
 
-`output.receipt` 为 `status: "written"|"disabled", output_dir: str|None, files: dict[str,str]`；files 从实际输出文件名映射至绝对路径。未配置目录时 status=disabled、output_dir=None、files 为空；当前 Writer.write 占位阶段同样使用 disabled 表示未写金融文件，即使独立运行日志已写出。正式文件写入失败时不发布 receipt。
+`output.receipt` 为 `status: "written"|"disabled", output_dir: str|None, files: dict[str,str]`；files 从实际输出文件名映射至绝对路径。未配置目录时 status=disabled、output_dir=None、files 为空。正式文件写入失败时不发布 receipt。
 
-Result Writer 输出 metrics.json、七张 CSV 和 run.log。它只序列化已发布结果，不补标签、不重算收益或费用。run.log 包含协议版本、价格/标签/基准模式、配置、数据能力、阶段进度、公司行为摘要及失败信息；运行耗时等诊断值不参与金融结果的确定性判断。
+Result Writer 输出 metrics.json、七张 CSV 和 run.log。它只序列化已发布结果，不补标签、不重算收益或费用。run.log 包含协议版本、价格/标签/基准模式、配置、数据能力、阶段进度及失败信息；运行耗时等诊断值不参与金融结果的确定性判断。
 
 ## 12. 接口文件归属
 
@@ -563,9 +562,8 @@ Result Writer 输出 metrics.json、七张 CSV 和 run.log。它只序列化已�
 | 未来收益标签 | `src/skd_backtest/label_provider.py` |
 | 模型调用与校验 | `src/skd_backtest/submission_runner.py` |
 | 预测评价 | `src/skd_backtest/prediction_evaluator.py` |
-| 组合优化 | `src/skd_backtest/portfolio_optimizer.py` |
+| 组合优化 | `src/skd_backtest/portfolio_optimizer.py`、`risk_optimizer.py` |
 | 交易执行 | `src/skd_backtest/broker.py` |
-| 公司行为 | `src/skd_backtest/corporate_actions.py` |
 | 费用计算 | `src/skd_backtest/cost_model.py` |
 | 每日核算 | `src/skd_backtest/accounting.py` |
 | 指标计算 | `src/skd_backtest/metrics.py` |
@@ -573,9 +571,9 @@ Result Writer 输出 metrics.json、七张 CSV 和 run.log。它只序列化已�
 
 contracts.py 只声明数据包、主题、阶段和角色，不包含金融算法；runtime_cache.py 只实现缓存协议。各业务模块仅依赖协议、自己的配置及已有通用库，不相互导入业务类。需要私有辅助文件时放入本任务独占范围；同一 Broker 或 Optimizer 内的多种算法不自动成为可同时修改同一文件的任务。
 
-市场数据与参考数据分工按数据形态固定：真实/复权 OHLC、限价、停牌及价格参考属于市场流；公司行为、基准、权重和行业属于 Reference Data；事后价格读取及标签属于 Label Provider。Reference Data 和 Label Provider 不调用或修改正在播放的 DataProvider 实例。
+市场数据与参考数据分工按数据形态固定：真实/复权 OHLC、限价、停牌及价格参考属于市场流；基准、权重、行业和风险参数属于 Reference Data；事后价格读取及标签属于 Label Provider。Reference Data 和 Label Provider 不调用或修改正在播放的 DataProvider 实例。
 
-接口接入已完成，共享协议、配置、表结构及 Engine 在业务并行阶段冻结为只读依赖；必要接口变更由唯一基础设施维护者统一修改。各组件已有独占文件和固定入口，不需要修改其他组件即可补全本文约定的金融行为。新增第三方依赖由基础设施维护者统一登记。基础设施已直接验证默认占位组件全流程，并用协议替身验证计费交接与异常边界；业务集中测试仍在组件实现后统一整合，不作为并行开发的前置条件。
+接口接入已完成，共享协议、配置、表结构及 Engine 在业务并行阶段冻结为只读依赖；必要接口变更由唯一基础设施维护者统一修改。各组件已有独占文件和固定入口，不需要修改其他组件即可补全本文约定的金融行为。新增第三方依赖由基础设施维护者统一登记。组件专项测试和真实组件联调共同验证金融结果；协议替身继续用于检查阶段交接、计费与异常边界。集中联调由基础设施维护者负责，不要求组件任务共同修改同一测试文件。
 
 ## 13. 与只读需求的对应关系
 
@@ -583,14 +581,13 @@ contracts.py 只声明数据包、主题、阶段和角色，不包含金融算�
 |---|---|
 | 截至 t 的信息、禁止未来信息 | 模型只接收原研究窗口；主题按日期和阶段开放；标签仅事后可读 |
 | t 收盘信号、t+1 开盘成交 | signal_calendar 与以执行日为键的 TargetPlan，禁止延迟消费 |
-| 公司行为 → 交易 → 收盘估值 | 阶段快照及固定执行顺序 |
+| 日初结算 → 交易 → 收盘估值 | 阶段快照及固定执行顺序 |
 | 先卖后买、T+1、现金非负 | Broker 独占实际账户推进，锁定批次及逐笔计费交换 |
 | 后复权与真实价格分离 | 不同账户持仓结构、明确行情字段及运行模式 |
-| 公司行为只计一次 | 真实模式事件去重，后复权模式不额外入账 |
 | Optimizer 与 Broker 独立 | 仅通过 TargetPlan、实际权重协议关联 |
 | 历史费率独立计算 | Cost Model 消费当日请求并发布报价，不由 Broker 复制算法 |
 | 每日 NAV、基准 NAV 和主动收益 | CloseSnapshot、BenchmarkDay 及每日核算字段 |
 | 预测评价与交易评价分离 | 分数及标签独立评价，预测标签不依赖成交 |
-| 完整审计与可复现 | 唯一生产者、确定性日期/ID/顺序、七张审计表及统一配置 |
+| 完整审计与可复现 | 唯一生产者、确定性日期/ID/顺序、七张审计表、固定随机流及每次评测模型状态 |
 
 上述设计保持需求中的模块责任及数据隔离原则。接口签名和数据搬运方式改为缓存协议，不改变参赛模型接口、金融含义或第一版与正式优化器的替换边界。

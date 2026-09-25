@@ -9,6 +9,7 @@ from pathlib import Path
 from time import perf_counter
 
 import pandas as pd
+import pyarrow as pa
 
 from .config import BacktestConfig
 from .schemas import SOURCE_COLUMNS
@@ -29,13 +30,15 @@ class DailyData:
     execution_date: str | None
 
 
-def _price_history(market, dates, previous):
+def _price_history(market, dates, previous, close_column="close"):
     """Align observed/previously seen securities and carry only past valid prices."""
     codes = sorted(set(market["代码"]) | set(previous.index))
     index = pd.MultiIndex.from_product([dates, codes], names=["日期", "代码"])
     result = market.assign(is_missing=False).set_index(["日期", "代码"]).reindex(index)
     result["is_missing"] = result["is_missing"].isna()
-    valid = result["close"].where(result["close"].between(0, float("inf"), inclusive="neither"))
+    valid = result[close_column].where(
+        result[close_column].between(0, float("inf"), inclusive="neither")
+        & result["is_suspend"].eq(False).fillna(False))
     code_index = index.get_level_values("代码")
     days = pd.Series(index.get_level_values("日期"), index=index).where(valid.notna())
     for values, name, previous_name in (
@@ -61,9 +64,30 @@ def _price_history(market, dates, previous):
 class DataProvider:
     def __init__(self, config: BacktestConfig, *, load_research: bool = True):
         self.config = config
-        self._datasets = SOURCE_COLUMNS if load_research else {
+        self.load_research = load_research
+        capabilities = config.data_capabilities
+        self._raw_price_source = None
+        if config.price_mode == "raw_price":
+            if capabilities.raw_prices:
+                self._raw_price_source = "raw"
+            elif capabilities.adjustment_factors:
+                self._raw_price_source = "factor"
+
+        self._datasets = dict(SOURCE_COLUMNS) if load_research else {
             "MarketData": ("日期", "代码", "open", "close", "is_suspend"),
         }
+        market_columns = list(self._datasets["MarketData"])
+        if config.price_mode == "raw_price":
+            if self._raw_price_source == "raw":
+                market_columns.extend(("raw_open", "raw_high", "raw_low", "raw_close"))
+            elif self._raw_price_source == "factor":
+                market_columns.extend(("open", "high", "low", "close", "adjustment_factor"))
+            market_columns.extend(("upper_limit", "lower_limit"))
+        self._datasets["MarketData"] = tuple(dict.fromkeys(market_columns))
+        self._market_open_column = "raw_open" if config.price_mode == "raw_price" else "open"
+        self._market_close_column = "raw_close" if config.price_mode == "raw_price" else "close"
+        self._market_open_label = "raw_open" if config.price_mode == "raw_price" else "adjusted_open"
+        self._market_close_label = "raw_close" if config.price_mode == "raw_price" else "adjusted_close"
         self._executor = None
         self._pending = None
         self._tables = {}
@@ -92,6 +116,69 @@ class DataProvider:
     def monthly_path(self, dataset: str, year: int, month: int) -> Path:
         return self.config.data_dir / dataset / str(year) / f"{month:02d}" / f"{year}{month:02d}.parquet"
 
+    def _read_parquet(self, path: Path, columns, **kwargs):
+        try:
+            return pd.read_parquet(path, columns=list(columns), **kwargs)
+        except (pa.ArrowInvalid, KeyError) as exc:
+            requested = ", ".join(columns)
+            raise ValueError(f"cannot read required columns ({requested}) from {path}: {exc}") from exc
+
+    def _validate_market_mode(self) -> None:
+        capabilities = self.config.data_capabilities
+        missing = [name for name in ("adjusted_prices", "suspension")
+                   if not getattr(capabilities, name)]
+        if missing:
+            raise ValueError("missing data capabilities: " + ", ".join(missing))
+        if self.config.price_mode == "raw_price":
+            if self._raw_price_source is None:
+                raise NotImplementedError("raw_price requires raw_prices or adjustment_factors capability")
+            if not capabilities.price_limits:
+                raise ValueError("missing data capabilities: price_limits")
+
+    @staticmethod
+    def _adjustment_factor(table: pd.DataFrame, path: Path) -> pd.Series:
+        factor = pd.to_numeric(table["adjustment_factor"], errors="coerce")
+        if not (factor.gt(0) & factor.lt(float("inf"))).all():
+            raise ValueError(f"adjustment_factor must be positive and finite in {path}")
+        return factor
+
+    def _restore_raw_prices(self, table: pd.DataFrame, path: Path) -> pd.DataFrame:
+        if self._raw_price_source == "factor":
+            factor = self._adjustment_factor(table, path)
+            for name in ("open", "high", "low", "close"):
+                if name in table:
+                    adjusted = pd.to_numeric(table[name], errors="coerce")
+                    table[f"raw_{name}"] = adjusted / factor
+        if self.config.price_mode == "raw_price" and {"upper_limit", "lower_limit"}.issubset(table):
+            upper = pd.to_numeric(table["upper_limit"], errors="coerce")
+            lower = pd.to_numeric(table["lower_limit"], errors="coerce")
+            valid = (upper.gt(0) & upper.lt(float("inf")) & lower.gt(0)
+                     & lower.lt(float("inf")) & lower.lt(upper))
+            if not valid.all():
+                raise ValueError(f"upper_limit/lower_limit must be finite, positive, and ordered in {path}")
+            table["upper_limit"] = upper
+            table["lower_limit"] = lower
+        return table
+
+    def _read_seed_prices(self, path: Path) -> pd.DataFrame:
+        close_column = "close"
+        columns = ["日期", "代码", close_column, "is_suspend"]
+        if self.config.price_mode == "raw_price":
+            if self._raw_price_source == "raw":
+                close_column = "raw_close"
+                columns[2] = close_column
+            elif self._raw_price_source == "factor":
+                columns.append("adjustment_factor")
+        seed = self._read_parquet(
+            path, columns, filters=[("日期", "<", self._first_date)],
+        )
+        seed = self._restore_raw_prices(seed, path)
+        if self.config.price_mode == "raw_price":
+            close_column = "raw_close"
+        seed = seed.loc[seed["is_suspend"].eq(False).fillna(False)]
+        seed = seed.rename(columns={close_column: "reference_close", "日期": "reference_date"})
+        return seed[["代码", "reference_close", "reference_date"]]
+
     def prepare(self) -> list[str]:
         """Read the real calendar and enough available history for lookback."""
         if self._playing:
@@ -110,8 +197,7 @@ class DataProvider:
         self._batch_index = -1
         self._current_date = None
         self._batches = []
-        if self.config.price_mode != "adjusted_return":
-            raise NotImplementedError("raw_price requires raw OHLC/adjustment factors; available prices are adjusted")
+        self._validate_market_mode()
         started = perf_counter()
         start = int(self.config.start_date.replace("-", ""))
         end = int(self.config.end_date.replace("-", ""))
@@ -119,9 +205,9 @@ class DataProvider:
         month_first_dates = {}
 
         def read_dates(month):
-            values = pd.read_parquet(
-                self.monthly_path("MarketData", month.year, month.month),
-                columns=["日期"], filters=[("日期", "<=", end)],
+            path = self.monthly_path("MarketData", month.year, month.month)
+            values = self._read_parquet(
+                path, ["日期"], filters=[("日期", "<=", end)],
             )["日期"].drop_duplicates()
             self.stats["calendar_files"] += 1
             month_first_dates[month] = values.min() if not values.empty else None
@@ -174,10 +260,13 @@ class DataProvider:
             parts = []
             for month in months:
                 path = self.monthly_path(name, month.year, month.month)
-                parts.append(pd.read_parquet(
-                    path, columns=list(columns),
+                table = self._read_parquet(
+                    path, columns,
                     filters=[("日期", ">=", self._first_date), ("日期", "<=", self._last_date)],
-                ))
+                )
+                if name == "MarketData":
+                    table = self._restore_raw_prices(table, path)
+                parts.append(table)
                 byte_count += path.stat().st_size
             tables[name] = pd.concat(parts, ignore_index=True)
             rows[name] = len(tables[name])
@@ -189,21 +278,22 @@ class DataProvider:
             state = pd.DataFrame(columns=["reference_close", "reference_date"])
             state.index.name = "代码"
             for path in self._seed_paths:
-                seed = pd.read_parquet(path, columns=["日期", "代码", "close"],
-                                       filters=[("日期", "<", self._first_date)])
+                seed = self._read_seed_prices(path)
                 seed_rows += len(seed)
                 seed_files += 1
                 known_codes = state.index.union(seed["代码"].drop_duplicates())
-                seed = seed[seed["close"].between(0, float("inf"), inclusive="neither")]
-                latest = seed.sort_values("日期").drop_duplicates("代码", keep="last").set_index("代码")
-                latest = latest.rename(columns={"close": "reference_close", "日期": "reference_date"})
+                seed = seed[seed["reference_close"].between(0, float("inf"), inclusive="neither")]
+                latest = seed.sort_values("reference_date").drop_duplicates("代码", keep="last").set_index("代码")
                 state = pd.concat([state, latest]).loc[lambda frame: ~frame.index.duplicated(keep="last")]
                 state = state.reindex(known_codes)
             self._price_state = state
         first = int(months[0].start_time.strftime("%Y%m%d"))
         last = int(months[-1].end_time.strftime("%Y%m%d"))
         dates = [day for day in self._calendar if first <= day <= last]
-        tables["_market"], self._price_state = _price_history(market, dates, self._price_state)
+        tables["_market"], self._price_state = _price_history(
+            market, dates, self._price_state, self._market_close_column)
+        if self.load_research and self.config.price_mode == "raw_price":
+            tables["MarketData"] = tables["MarketData"].loc[:, list(SOURCE_COLUMNS["MarketData"])]
         if "Barra_factor" in tables:
             membership = tables["Barra_factor"][["日期", "代码"]]
             for name in ("Factor33_winsor", "MarketData"):
@@ -281,11 +371,16 @@ class DataProvider:
     def open_market(self, date: str) -> pd.DataFrame:
         day = self._ensure_loaded(date)
         started = perf_counter()
-        logger.debug("[DataProvider.open_market] %s; adjusted prices", date)
-        result = self._slice(self._tables["_market"], day, day, [
-            "代码", "open", "is_suspend", "is_missing", "previous_close", "previous_close_date",
-        ]).rename(
-            columns={"代码": "code", "open": "adjusted_open", "is_suspend": "is_suspended"},
+        logger.debug("[DataProvider.open_market] %s; %s prices", date, self._market_open_label)
+        columns = [
+            "代码", self._market_open_column, "is_suspend", "is_missing",
+            "previous_close", "previous_close_date",
+        ]
+        if self.config.price_mode == "raw_price":
+            columns.extend(("upper_limit", "lower_limit"))
+        result = self._slice(self._tables["_market"], day, day, columns).rename(
+            columns={"代码": "code", self._market_open_column: self._market_open_label,
+                     "is_suspend": "is_suspended"},
         ).assign(date=date)
         self.stats["open_rows"] += len(result)
         self.stats["market_seconds"] += perf_counter() - started
@@ -294,12 +389,13 @@ class DataProvider:
     def close_market(self, date: str) -> pd.DataFrame:
         day = self._ensure_loaded(date)
         started = perf_counter()
-        logger.debug("[DataProvider.close_market] %s; adjusted prices", date)
+        logger.debug("[DataProvider.close_market] %s; %s prices", date, self._market_close_label)
         result = self._slice(self._tables["_market"], day, day, [
-            "代码", "close", "is_suspend", "is_missing", "has_valid_close",
+            "代码", self._market_close_column, "is_suspend", "is_missing", "has_valid_close",
             "previous_close", "previous_close_date", "reference_close", "reference_date", "is_stale",
         ]).rename(
-            columns={"代码": "code", "close": "adjusted_close", "is_suspend": "is_suspended"},
+            columns={"代码": "code", self._market_close_column: self._market_close_label,
+                     "is_suspend": "is_suspended"},
         ).assign(date=date)
         self.stats["close_rows"] += len(result)
         self.stats["market_seconds"] += perf_counter() - started
@@ -334,7 +430,7 @@ class DataProvider:
         Only MarketData is read. This uses a fresh reader and does not change playback state.
         Missing requested securities remain explicit rows with unknown prices.
         """
-        columns = ["code", "adjusted_close", "is_suspended", "is_missing", "has_valid_close",
+        columns = ["code", self._market_close_label, "is_suspended", "is_missing", "has_valid_close",
                    "previous_close", "previous_close_date", "reference_close", "reference_date", "is_stale", "date"]
         if codes is not None:
             codes = list(dict.fromkeys(codes))

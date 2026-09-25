@@ -1,4 +1,4 @@
-"""Repeatable data and cache-backed engine benchmark; financial algorithms are placeholders."""
+"""Repeatable data-playback and full-engine benchmark."""
 
 import argparse
 from contextlib import closing
@@ -133,7 +133,7 @@ def run_once(args, prefetch, scope):
             for day in days:
                 dates.append(day.date)
                 consume_started = perf_counter()
-                # Touch actual values, including carried prices; no finance stubs or audit tables.
+                # Touch actual values, including carried prices; no financial components or audit tables.
                 market_digest.update(day.date.encode())
                 market_digest.update(struct.pack(
                     "<dddqq", float(day.open_market["adjusted_open"].sum()),
@@ -276,7 +276,7 @@ def main():
                   "Sampling may miss short peaks; actual gaps are reported. Sampling overhead is included. "
                   "Framework DEBUG logs disabled; worker JSON output and per-run console summaries occur after measurement. "
                   "Both scopes include signal checks/hashes and mock inference; data scope also touches daily prices. "
-                  "Engine scope includes runtime cache exchanges, daily snapshots and financial placeholders; "
+                  "Engine scope includes runtime cache exchanges, daily snapshots, financial calculations and audit collection; "
                   "data scope calls no financial modules. "
                   "async_inference controls a separate single model worker for the engine scope; "
                   "the sync/async mode labels still refer only to data reading. "

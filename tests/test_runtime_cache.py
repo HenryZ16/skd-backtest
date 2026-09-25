@@ -13,14 +13,14 @@ from pandas.testing import assert_frame_equal
 
 from skd_backtest import BacktestEngine
 from skd_backtest.contracts import (
-    ActionResult, ComponentRole as Role, CostQuote, CostRequest, Dataset, ExecutionResult,
+    ComponentRole as Role, CostQuote, CostRequest, Dataset, ExecutionResult,
     MarketContext, OpenSnapshot, CloseSnapshot, OutputReceipt, Phase, PredictionResult,
     RunCalendar, RunContext, TargetPlan, Topic,
 )
 from skd_backtest.reference_data import ReferenceDataProvider
 from skd_backtest.runtime_cache import RuntimeCache
 from skd_backtest.schemas import (
-    ACTION_COLUMNS, EVENT_COLUMNS, LABEL_COLUMNS, METRIC_NAMES, RESULT_COLUMNS, VALUE_COLUMNS, WEIGHT_COLUMNS, empty_result,
+    LABEL_COLUMNS, METRIC_NAMES, RESULT_COLUMNS, VALUE_COLUMNS, WEIGHT_COLUMNS, empty_result,
 )
 from skd_backtest.submission_runner import SubmissionRunner
 
@@ -38,11 +38,8 @@ class RuntimeCacheTest(unittest.TestCase):
         self.state = self.root.read(Topic.ACCOUNT_INITIAL).account
         self.root.publish(Topic.RUN_CALENDAR, None, RunCalendar.from_dates(self.dates, 1))
 
-    def pre_open(self, day):
-        self.cache.advance(date=day, phase=Phase.PRE_OPEN)
-        self.views[Role.REFERENCE_DATA].publish(Topic.REFERENCE_ACTIONS, day, Dataset("unavailable", None, "no source"))
-        self.views[Role.CORPORATE_ACTIONS].publish(
-            Topic.ACCOUNT_ACTIONS, day, ActionResult(day, self.state, pd.DataFrame(columns=EVENT_COLUMNS)))
+    def settle_day(self, day):
+        self.cache.advance(date=day, phase=Phase.SETTLEMENT)
         self.views[Role.BROKER].publish(Topic.ACCOUNT_SETTLED, day, self.state)
         self.cache.advance(date=day, phase=Phase.OPEN_VALUE)
         self.views[Role.ACCOUNTING].publish(Topic.ACCOUNT_OPEN, day,
@@ -75,39 +72,33 @@ class RuntimeCacheTest(unittest.TestCase):
             self.cache.finish_day(date=day)
 
     def test_stages_permissions_dates_and_borrowed_references(self):
-        with self.assertRaises(RuntimeError):
-            self.cache.advance(date=self.dates[0], phase=Phase.EXECUTION)
         day = self.dates[0]
-        self.cache.advance(date=day, phase=Phase.PRE_OPEN)
-        reference, actions, broker = self.views[Role.REFERENCE_DATA], self.views[Role.CORPORATE_ACTIONS], self.views[Role.BROKER]
+        with self.assertRaises(RuntimeError):
+            self.cache.advance(date=day, phase=Phase.EXECUTION)
+        self.cache.advance(date=day, phase=Phase.SETTLEMENT)
+        broker, accounting = self.views[Role.BROKER], self.views[Role.ACCOUNTING]
         with self.assertRaises(KeyError):
-            actions.read(Topic.REFERENCE_ACTIONS, day)
+            accounting.read(Topic.ACCOUNT_SETTLED, day)
         with self.assertRaises(PermissionError):
             broker.read(Topic.EVALUATION_LABELS)
         with self.assertRaises(PermissionError):
-            broker.publish(Topic.REFERENCE_ACTIONS, day, Dataset("unavailable", None, "missing"))
-        reference.publish(Topic.REFERENCE_ACTIONS, day, Dataset("unavailable", None, "missing"))
-        with self.assertRaises(RuntimeError):
-            reference.publish(Topic.REFERENCE_ACTIONS, day, Dataset("unavailable", None, "missing"))
+            accounting.publish(Topic.ACCOUNT_SETTLED, day, self.state)
         with self.assertRaises(ValueError):
-            actions.publish(Topic.ACCOUNT_ACTIONS, day,
-                ActionResult(self.dates[1], self.state, pd.DataFrame(columns=EVENT_COLUMNS)))
-        self.assertFalse(self.root.contains(Topic.ACCOUNT_ACTIONS, day))
-        packet = ActionResult(day, self.state, pd.DataFrame(columns=EVENT_COLUMNS))
-        actions.publish(Topic.ACCOUNT_ACTIONS, day, packet)
-        borrowed = broker.read(Topic.ACCOUNT_ACTIONS, day)
-        self.assertIs(borrowed, packet)
-        self.assertIs(borrowed.account, self.state)
-        # Copy only what the next producer changes; unchanged tables stay shared.
-        positions = borrowed.account.positions.copy()
-        positions.loc[0] = ["SH600000", 50.0, 10.0, day]
-        next_state = replace(borrowed.account, positions=positions)
-        self.assertIs(next_state.locked_lots, self.state.locked_lots)
-        self.assertTrue(borrowed.account.positions.empty)
+            broker.publish(Topic.ACCOUNT_SETTLED, self.dates[1], self.state)
         with self.assertRaises(RuntimeError):
             self.cache.advance(date=day, phase=Phase.OPEN_VALUE)
+        broker.publish(Topic.ACCOUNT_SETTLED, day, self.state)
+        borrowed = accounting.read(Topic.ACCOUNT_SETTLED, day)
+        self.assertIs(borrowed, self.state)
+        positions = borrowed.positions.copy()
+        positions.loc[0] = ["SH600000", 50.0, 10.0, day]
+        next_state = replace(borrowed, positions=positions)
+        self.assertIs(next_state.locked_lots, self.state.locked_lots)
+        self.assertTrue(borrowed.positions.empty)
+        with self.assertRaises(RuntimeError):
+            broker.publish(Topic.ACCOUNT_SETTLED, day, self.state)
         with self.assertRaises(PermissionError):
-            actions.read(Topic.ACCOUNT_CLOSE, self.dates[1])
+            broker.read(Topic.ACCOUNT_CLOSE, self.dates[1])
         with ThreadPoolExecutor(max_workers=1) as pool:
             with self.assertRaises(RuntimeError):
                 pool.submit(broker.read, Topic.RUN_CONTEXT).result()
@@ -115,45 +106,45 @@ class RuntimeCacheTest(unittest.TestCase):
     def test_schemas_are_checked_once_and_empty_history_is_not_retained(self):
         first, second, third = self.dates
         with patch.object(cache_module, "_frame", wraps=cache_module._frame) as checks:
-            self.pre_open(first)
+            self.settle_day(first)
             self.close_day(first)
             first_day_checks = checks.call_count
             self.assertGreater(first_day_checks, 0)
-            self.pre_open(second)
+            self.settle_day(second)
             self.close_day(second)
-            self.pre_open(third)
+            self.settle_day(third)
             self.close_day(third)
             self.assertEqual(checks.call_count, first_day_checks)
-        self.assertFalse(self.cache._event_history)
-        self.assertFalse(self.cache._event_ids)
         self.assertFalse(self.cache._audit["positions"])
 
     def test_invalid_initial_schema_can_be_corrected_before_publication(self):
         day = self.dates[0]
-        self.cache.advance(date=day, phase=Phase.PRE_OPEN)
-        reference = self.views[Role.REFERENCE_DATA]
-        reference.publish(Topic.REFERENCE_ACTIONS, day, Dataset("unavailable", None, "missing"))
-        actions = self.views[Role.CORPORATE_ACTIONS]
+        self.cache.advance(date=day, phase=Phase.SETTLEMENT)
+        broker = self.views[Role.BROKER]
         with self.assertRaises(ValueError):
-            actions.publish(Topic.ACCOUNT_ACTIONS, day, ActionResult(day, self.state, pd.DataFrame()))
-        self.assertFalse(self.root.contains(Topic.ACCOUNT_ACTIONS, day))
-        actions.publish(Topic.ACCOUNT_ACTIONS, day,
-                        ActionResult(day, self.state, pd.DataFrame(columns=EVENT_COLUMNS)))
+            broker.publish(Topic.ACCOUNT_SETTLED, day, replace(self.state, positions=pd.DataFrame()))
+        self.assertFalse(self.root.contains(Topic.ACCOUNT_SETTLED, day))
+        broker.publish(Topic.ACCOUNT_SETTLED, day, self.state)
 
-    def test_adjusted_mode_does_not_load_corporate_actions(self):
-        day = self.dates[0]
-        self.cache.advance(date=day, phase=Phase.PRE_OPEN)
-        provider = ReferenceDataProvider(self.engine.config)
-        with patch.object(provider, "_external", side_effect=AssertionError("unexpected source access")):
-            provider.prepare_open(date=day, cache=self.views[Role.REFERENCE_DATA])
-        self.engine.corporate_actions.apply(date=day, cache=self.views[Role.CORPORATE_ACTIONS])
-        packet = self.views[Role.BROKER].read(Topic.ACCOUNT_ACTIONS, day)
-        self.assertIs(packet.account, self.state)
-        self.assertTrue(packet.events.empty)
+    def test_settlement_reads_initial_and_then_previous_close(self):
+        first, second = self.dates[:2]
+        self.cache.advance(date=first, phase=Phase.SETTLEMENT)
+        self.engine.broker.start_day(date=first, cache=self.views[Role.BROKER])
+        self.assertIs(self.root.read(Topic.ACCOUNT_SETTLED, first), self.state)
+        self.cache.advance(date=first, phase=Phase.OPEN_VALUE)
+        self.views[Role.ACCOUNTING].publish(Topic.ACCOUNT_OPEN, first,
+            OpenSnapshot(first, self.state, pd.DataFrame(columns=VALUE_COLUMNS), 0.0, 100.0))
+        self.cache.advance(date=first, phase=Phase.EXECUTION)
+        self.state = replace(self.state, cash=90.0)
+        self.close_day(first)
+        self.cache.advance(date=second, phase=Phase.SETTLEMENT)
+        self.engine.broker.start_day(date=second, cache=self.views[Role.BROKER])
+        self.assertIs(self.root.read(Topic.ACCOUNT_SETTLED, second), self.state)
+        self.assertEqual(self.root.read(Topic.ACCOUNT_SETTLED, second).cash, 90.0)
 
     def test_quote_identity_revisions_and_release(self):
         day = self.dates[0]
-        self.pre_open(day)
+        self.settle_day(day)
         broker, cost = self.views[Role.BROKER], self.views[Role.COST_MODEL]
         request = CostRequest(1, "order-1", day, "BUY", "adjusted_return", None, None, 10.0)
         broker.publish(Topic.COST_REQUEST, (day, 1), request)
@@ -178,8 +169,8 @@ class RuntimeCacheTest(unittest.TestCase):
         broker.finish_quote(date=day, request_id=2)
         broker.publish(Topic.COST_REQUEST, (day, 3), replace(request, request_id=3))
         self.engine.cost_model.calculate(date=day, request_id=3, cache=cost)
-        placeholder = broker.read(Topic.COST_RESULT, (day, 3))
-        self.assertEqual((placeholder.execution_price, placeholder.cash_delta, placeholder.total_cost),
+        quote_result = broker.read(Topic.COST_RESULT, (day, 3))
+        self.assertEqual((quote_result.execution_price, quote_result.cash_delta, quote_result.total_cost),
                          (None, -10.0, 0.0))
         broker.finish_quote(date=day, request_id=3)
         self.close_day(day)
@@ -187,18 +178,18 @@ class RuntimeCacheTest(unittest.TestCase):
 
     def test_retention_history_evaluation_and_closed_views(self):
         first, second, third = self.dates
-        self.pre_open(first)
+        self.settle_day(first)
         self.close_day(first)
         self.assertTrue(self.root.contains(Topic.SIGNAL_TARGETS, second))
         self.assertFalse(self.root.contains(Topic.ACCOUNT_OPEN, first))
-        self.pre_open(second)
+        self.settle_day(second)
         with self.assertRaises(PermissionError):
             self.views[Role.BROKER].read(Topic.SIGNAL_TARGETS, third)
         self.assertEqual(self.views[Role.BROKER].read(Topic.SIGNAL_TARGETS, second).signal_date, first)
         self.close_day(second)
         self.assertFalse(self.root.contains(Topic.ACCOUNT_CLOSE, first))
         self.assertFalse(self.root.contains(Topic.SIGNAL_TARGETS, second))
-        self.pre_open(third)
+        self.settle_day(third)
         self.close_day(third)
         with self.assertRaises(PermissionError):
             self.views[Role.OPTIMIZER].history(Topic.SIGNAL_SCORES)
@@ -241,7 +232,7 @@ class RuntimeCacheTest(unittest.TestCase):
             root.publish(Topic.RUN_CALENDAR, None, wrong)
         self.assertFalse(root.contains(Topic.RUN_CALENDAR))
         # Exercise a table containing mutable object cells through a permitted packet.
-        self.pre_open(self.dates[0])
+        self.settle_day(self.dates[0])
         self.close_day(self.dates[0], finish=False)
         source = self.root.read(Topic.MARKET_CONTEXT, self.dates[0])
         # Borrowing retains the packet and all nested buffers; consumers do not mutate them.
@@ -260,7 +251,7 @@ class RuntimeCacheTest(unittest.TestCase):
         self.state = self.root.read(Topic.ACCOUNT_INITIAL).account
         self.root.publish(Topic.RUN_CALENDAR, None, RunCalendar.from_dates(self.dates, 1))
         day = self.dates[0]
-        self.pre_open(day)
+        self.settle_day(day)
         broker, cost = self.views[Role.BROKER], self.views[Role.COST_MODEL]
         request = CostRequest(1, "raw-order", day, "SELL", "raw_price", 10.0, 100, None)
         for invalid in (replace(request, shares=0), replace(request, shares=1.5),
@@ -278,43 +269,10 @@ class RuntimeCacheTest(unittest.TestCase):
         broker.finish_quote(date=day, request_id=1)
         broker.publish(Topic.COST_REQUEST, (day, 2), replace(request, request_id=2))
         self.engine.cost_model.calculate(date=day, request_id=2, cache=cost)
-        placeholder = broker.read(Topic.COST_RESULT, (day, 2))
-        self.assertEqual((placeholder.execution_price, placeholder.cash_delta, placeholder.total_cost),
+        quote_result = broker.read(Topic.COST_RESULT, (day, 2))
+        self.assertEqual((quote_result.execution_price, quote_result.cash_delta, quote_result.total_cost),
                          (10.0, 1000.0, 0.0))
         broker.finish_quote(date=day, request_id=2)
-
-    def test_corporate_events_respect_open_visibility_and_cannot_repeat(self):
-        first, second = self.dates[:2]
-        self.cache.advance(date=first, phase=Phase.PRE_OPEN)
-        reference = self.views[Role.REFERENCE_DATA]
-        event = pd.DataFrame([dict(event_id="dividend-1", code="SH600000", action="CASH_DIVIDEND",
-                                   known_date=first, known_phase="CLOSE_VALUE", effective_date=first,
-                                   record_date="2017-12-29", cash_per_share=1.0)], columns=ACTION_COLUMNS)
-        with self.assertRaises(ValueError):
-            reference.publish(Topic.REFERENCE_ACTIONS, first, Dataset("available", event))
-        self.assertFalse(self.root.contains(Topic.REFERENCE_ACTIONS, first))
-        event["known_phase"] = "PRE_OPEN"
-        reference.publish(Topic.REFERENCE_ACTIONS, first, Dataset("available", event))
-        events = pd.DataFrame([dict(event_id="dividend-1", date=first, code="SH600000", record_shares=0,
-                                    cash_delta=0., shares_delta=0, status="SKIPPED", reason="adjusted")],
-                              columns=EVENT_COLUMNS)
-        actions = self.views[Role.CORPORATE_ACTIONS]
-        actions.publish(Topic.ACCOUNT_ACTIONS, first, ActionResult(first, self.state, events))
-        self.views[Role.BROKER].publish(Topic.ACCOUNT_SETTLED, first, self.state)
-        self.cache.advance(date=first, phase=Phase.OPEN_VALUE)
-        self.views[Role.ACCOUNTING].publish(Topic.ACCOUNT_OPEN, first,
-            OpenSnapshot(first, self.state, pd.DataFrame(columns=VALUE_COLUMNS), 0., 100.))
-        self.cache.advance(date=first, phase=Phase.EXECUTION)
-        self.close_day(first)
-        self.cache.advance(date=second, phase=Phase.PRE_OPEN)
-        reference.publish(Topic.REFERENCE_ACTIONS, second, Dataset("unavailable", None, "missing"))
-        self.assertEqual(actions.history(Topic.ACCOUNT_ACTIONS).event_id.tolist(), ["dividend-1"])
-        with self.assertRaises(PermissionError):
-            actions.history(Topic.ACCOUNT_CLOSE, date=second)
-        with self.assertRaises(ValueError):
-            actions.publish(Topic.ACCOUNT_ACTIONS, second,
-                            ActionResult(second, self.state, events.assign(date=second)))
-        self.assertFalse(self.root.contains(Topic.ACCOUNT_ACTIONS, second))
 
     def test_logs_failure_isolation_and_dataset_states(self):
         for kwargs in (
@@ -337,7 +295,7 @@ class RuntimeCacheTest(unittest.TestCase):
         self.views[Role.BROKER].log(level="ERROR", message="failure")
         self.assertEqual(writer.log_records(after_seq=1)[0].phase, Phase.FAILED)
         with self.assertRaises(RuntimeError):
-            self.cache.advance(date=self.dates[0], phase=Phase.PRE_OPEN)
+            self.cache.advance(date=self.dates[0], phase=Phase.SETTLEMENT)
 
 
 if __name__ == "__main__":

@@ -58,11 +58,6 @@ STATE_COLUMNS = {
 LOCK_COLUMNS = ("code", "shares", "unlock_date", "reason")
 VALUE_COLUMNS = ("code", "price", "price_date", "market_value")
 WEIGHT_COLUMNS = ("code", "weight")
-ACTION_COLUMNS = (
-    "event_id", "code", "action", "known_date", "known_phase", "effective_date", "record_date",
-    "cash_per_share", "share_ratio", "subscription_price", "sellable_date", "reference_price_after_action",
-)
-EVENT_COLUMNS = ("event_id", "date", "code", "record_shares", "cash_delta", "shares_delta", "status", "reason")
 LABEL_COLUMNS = ("date", "code", "entry_date", "exit_date", "future_return", "label_price_basis", "missing_reason")
 METRIC_NAMES = (
     "mean_rankic", "rankic_std", "rankic_ir", "positive_rankic_ratio",

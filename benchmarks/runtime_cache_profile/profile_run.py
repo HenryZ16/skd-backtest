@@ -72,7 +72,7 @@ def main():
     parser.add_argument("--source", choices=("current", "head"), default="current")
     parser.add_argument("--ref", default="HEAD", help="Git revision for --source head")
     parser.add_argument("--mode", choices=("baseline", "cprofile", "inventory", "no_object_map",
-                                         "no_clone", "no_frame_check", "no_event_scan", "share_calendar", "sample", "empty_frame_fastpath"),
+                                         "no_clone", "no_frame_check", "share_calendar", "sample", "empty_frame_fastpath"),
                         default="baseline")
     parser.add_argument("--end", default="2022-12-31")
     parser.add_argument("--sync", action="store_true", help="disable background data reading")
@@ -123,11 +123,11 @@ def main():
         groups = Counter()
         if args.source == "current":
             import skd_backtest.runtime_cache as cache
-            from skd_backtest.contracts import RunCalendar, Topic
+            from skd_backtest.contracts import RunCalendar
             original_clone = getattr(cache, "_clone", None)
-            original_validate, original_frame = cache.RuntimeCache._validate, cache._frame
+            original_frame = cache._frame
             if original_clone is None and args.mode in (
-                    "empty_frame_fastpath", "no_object_map", "no_clone", "no_event_scan", "share_calendar"):
+                    "empty_frame_fastpath", "no_object_map", "no_clone", "share_calendar"):
                 parser.error("this ablation requires the pre-optimization cache; use baseline/cprofile/inventory")
             if args.mode == "empty_frame_fastpath":
                 def clone(value):
@@ -141,16 +141,6 @@ def main():
                 stack.enter_context(patch.object(cache, "_clone", lambda value: value))
             elif args.mode == "no_frame_check":
                 stack.enter_context(patch.object(cache, "_frame", lambda *a, **kw: None))
-            elif args.mode == "no_event_scan":
-                def validate(self, topic, key, value):
-                    if topic == Topic.ACCOUNT_ACTIONS and value.events.empty:
-                        history, self._event_history = self._event_history, []
-                        try:
-                            return original_validate(self, topic, key, value)
-                        finally:
-                            self._event_history = history
-                    return original_validate(self, topic, key, value)
-                stack.enter_context(patch.object(cache.RuntimeCache, "_validate", validate))
             elif args.mode == "share_calendar":
                 def clone(value):
                     return value if isinstance(value, RunCalendar) else original_clone(value)
@@ -170,18 +160,9 @@ def main():
                     counts["frame_checks"] += 1
                     counts["empty_frame_checks"] += int(isinstance(value, pd.DataFrame) and value.empty)
                     return original_frame(value, *a, **kw)
-                def validate(self, topic, key, value):
-                    if topic == Topic.ACCOUNT_ACTIONS:
-                        if original_clone is not None:
-                            counts["event_history_frames_scanned"] += len(self._event_history)
-                        else:
-                            counts["event_id_checks"] += len(value.events)
-                        counts["event_rows_published"] += len(value.events)
-                    return original_validate(self, topic, key, value)
                 if original_clone is not None:
                     stack.enter_context(patch.object(cache, "_clone", clone))
                 stack.enter_context(patch.object(cache, "_frame", frame))
-                stack.enter_context(patch.object(cache.RuntimeCache, "_validate", validate))
 
         profiler = cProfile.Profile() if args.mode == "cprofile" else None
         process = psutil.Process()

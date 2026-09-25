@@ -15,6 +15,8 @@
 
 ## 测量方法
 
+本节数据来自金融组件尚为占位的历史快照；不代表正式风险优化器和完整金融组件的当前性能。
+
 - 使用未修改的 examples/basic_usage.py 模型与配置：D:\Data，2016-01-01 至 2022-12-31，
   lookback=252、rebalance_interval=5、read_batch_months=12、output_dir=None。
 - 1,703 个交易日、341 次推理、102,300 条预测；所有实验启用后台读取，只有模型推理模式和附加延迟不同。

@@ -11,7 +11,6 @@ from .accounting import PortfolioAccounting
 from .broker import Broker
 from .config import BacktestConfig, CostConfig, DataCapabilities, OptimizerConfig, ReferenceSources
 from .contracts import ComponentRole as Role, MarketContext, Phase, RunCalendar, RunContext, Topic
-from .corporate_actions import CorporateActionEngine
 from .cost_model import CostModel
 from .data_provider import DataProvider
 from .inference_pipeline import inference_days
@@ -26,11 +25,12 @@ from .submission_runner import Inference, SubmissionRunner
 
 
 class BacktestEngine:
-    """Run the cache-backed skeleton; financial components currently publish placeholders."""
+    """Coordinate market playback, asynchronous inference, and financial components."""
 
     def __init__(
         self, *, data_dir: str | Path, start_date: str, end_date: str,
-        inference: Inference, initial_cash: float = 1_000_000.0,
+        inference: Inference | None = None, initial_cash: float = 1_000_000.0,
+        submission_dir: str | Path | None = None,
         rebalance_interval: int = 5, holding_period: int = 5, lookback: int = 252,
         price_mode: Literal["adjusted_return", "raw_price"] = "adjusted_return",
         optimizer_config: OptimizerConfig | None = None,
@@ -38,9 +38,9 @@ class BacktestEngine:
         trading_days_per_year: int = 252, risk_free_rate: float = 0.0,
         output_dir: str | Path | None = None,
         read_batch_months: int = 12, prefetch: bool = True, async_inference: bool = True,
+        random_seed: int = 0,
         benchmark_mode: Literal["none", "csi300"] = "none",
         label_price_basis: Literal["adjusted_open", "raw_open"] = "adjusted_open",
-        rights_policy: Literal["skip", "subscribe_available_cash"] = "skip",
         data_capabilities: DataCapabilities | None = None,
         reference_sources: ReferenceSources | None = None,
     ):
@@ -51,21 +51,28 @@ class BacktestEngine:
             trading_days_per_year=trading_days_per_year, risk_free_rate=risk_free_rate,
             output_dir=Path(output_dir) if output_dir is not None else None,
             read_batch_months=read_batch_months, prefetch=prefetch, async_inference=async_inference,
+            random_seed=random_seed,
             benchmark_mode=benchmark_mode, label_price_basis=label_price_basis,
-            rights_policy=rights_policy, data_capabilities=data_capabilities or DataCapabilities(),
+            data_capabilities=data_capabilities or DataCapabilities(),
             reference_sources=reference_sources or ReferenceSources(),
         )
         self.optimizer_config = optimizer_config or OptimizerConfig()
         self.cost_config = cost_config or CostConfig()
-        # Components retain only immutable configuration; runtime state belongs to the cache.
-        self.submission_runner = SubmissionRunner(inference)
+        # Business state belongs to the cache; readers own per-run source resources.
+        if (inference is None) == (submission_dir is None):
+            raise ValueError("provide exactly one of inference or submission_dir")
+        self.submission_runner = (
+            SubmissionRunner.from_submission(submission_dir, random_seed) if submission_dir is not None
+            else SubmissionRunner(inference, random_seed)
+        )
+        self._submission_dir = submission_dir
+        self._submission_has_run = False
         self.data_provider = DataProvider(self.config)
         self.reference_data = ReferenceDataProvider(self.config)
         self.label_provider = LabelProvider(self.config)
         self.prediction_evaluator = PredictionEvaluator()
         self.optimizer = PortfolioOptimizer(self.optimizer_config)
         self.broker = Broker(self.config)
-        self.corporate_actions = CorporateActionEngine(self.config)
         self.cost_model = CostModel(self.cost_config)
         self.accounting = PortfolioAccounting(self.config)
         self.metrics_calculator = Metrics(trading_days_per_year, risk_free_rate)
@@ -78,6 +85,13 @@ class BacktestEngine:
 
     def run(self) -> dict[str, float | int | None]:
         self.metrics, self.tables, self.account = None, {}, {}
+        if self._submission_dir is not None:
+            if self._submission_has_run:
+                self.submission_runner = SubmissionRunner.from_submission(
+                    self._submission_dir, self.config.random_seed)
+            self._submission_has_run = True
+        else:
+            self.submission_runner.reset_random_state()
         self.trading_dates, self.performance = [], {}
         started = perf_counter()
         cache = RuntimeCache(context=RunContext(self.config, self.optimizer_config, self.cost_config))
@@ -110,9 +124,7 @@ class BacktestEngine:
                     date = day.date
                     self.trading_dates.append(date)
                     market_rows += len(day.open_market)
-                    cache.advance(date=date, phase=Phase.PRE_OPEN)
-                    call(Role.REFERENCE_DATA, self.reference_data.prepare_open, date=date)
-                    call(Role.CORPORATE_ACTIONS, self.corporate_actions.apply, date=date)
+                    cache.advance(date=date, phase=Phase.SETTLEMENT)
                     call(Role.BROKER, self.broker.start_day, date=date)
                     cache.advance(date=date, phase=Phase.OPEN_VALUE)
                     call(Role.ACCOUNTING, self.accounting.mark_at_open, date=date, market=day.open_market)
@@ -194,10 +206,11 @@ class BacktestEngine:
             cleanup_error = None
             # Keep the log open while releasing the reader, so cleanup failures are recorded.
             for component, cleanup in (("data_provider", self.data_provider.close),
+                                       ("reference_data", self.reference_data.close),
                                        ("writer", lambda: self.result_writer.close(cache=views[Role.WRITER]))):
                 try:
                     cleanup()
-                    if component == "data_provider" and not failed:
+                    if component == "reference_data" and not failed and cleanup_error is None:
                         control.log(level="INFO", message="run completed")
                 except Exception as exc:
                     cleanup_error = cleanup_error or exc

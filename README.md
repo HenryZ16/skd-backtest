@@ -1,10 +1,13 @@
 # skd-backtest
 
-面向指数增强研究的日频 Python 回测框架。已实现逐日市场数据流、运行缓存、
-公共接口和组件接线；后续业务组件可按独占文件并行实现。
-默认分别使用后台线程预取数据和顺序执行模型推理，账户在需要分数时等待；可用 `async_inference=False` 单独关闭推理异步。
-交易、估值和金融指标算法保留可运行的占位实现；`engine.run()` 可跑通完整流程，
-金融指标目前仍为 `None`。
+面向指数增强研究的日频 Python 回测框架。已实现完整回测链路：
+市场数据、独立异步推理、运行缓存、组合构建、交易、费用、估值、标签、评价及审计输出。
+组件通过固定缓存协议交换非市场数据，代码按组件独占文件。
+
+默认分别使用后台线程预取数据和顺序执行模型推理，账户在需要分数时等待；
+可用 `async_inference=False` 单独关闭推理异步。`engine.run()` 返回 15 项原始指标，
+并保留最终账户和七张审计表。指定输出目录时生成指标 JSON、七张 CSV 和运行日志。
+优化器支持 Top-K、简单基准倾斜和 Barra 风险优化；正式方法支持主动权重、行业、风格及换手约束。
 
 ## 快速开始
 
@@ -15,11 +18,13 @@ python -m pip install -e .
 python examples/basic_usage.py
 ```
 
-[示例](examples/basic_usage.py) 通过 `engine.run()` 运行流程骨架，默认读取 `D:\Data`，运行 2016–2022 年区间；
+[示例](examples/basic_usage.py) 通过 `engine.run()` 运行回测流程，默认读取 `D:\Data`，运行 2016–2022 年区间；
 运行前请将示例中的 `data_dir` 改为实际数据目录。
 
 接入自己的模型时，将已初始化模型的 `model.predict` 作为 `inference` 传给
-`BacktestEngine`。完整示例与接口约定见[使用说明](docs/usage.md)。
+`BacktestEngine`；也可传入 `submission_dir`，由平台加载标准提交并管理每次评测的模型实例。
+`python evaluate.py --submission submission --config config.toml` 提供统一评测入口。
+完整配置、风险数据与可复现性约定见[使用说明](docs/usage.md)。
 
 ## 文档
 
@@ -27,4 +32,5 @@ python examples/basic_usage.py
 - [实现设计与开发](docs/design.md)：数据流、模块边界、当前进度、测试与打包。
 - [组件接口协议](docs/interfaces.md)：缓存主题、共享数据包、固定入口和并行文件归属。
 - [性能基线](docs/benchmarks.md)：复测方法、吞吐与内存结果、指标口径。
+- [总设计独立审查](docs/spec_audit.md)：需求覆盖矩阵、返修闭合与独立验证。
 - [开发规格](BACKTEST_PLATFORM_SPEC_v2.md)：只读需求文档。

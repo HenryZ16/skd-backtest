@@ -63,7 +63,7 @@ class SkeletonTest(unittest.TestCase):
             self.assertEqual([item for item in trace if item[0] == "target"],
                              [("target", "2018-01-02", "2018-01-03"), ("target", "2018-01-04", "2018-01-05")])
             for date in self.dates:
-                indices = [trace.index((name, date)) for name in ("actions", "settle", "open", "execute", "close")]
+                indices = [trace.index((name, date)) for name in ("settle", "open", "execute", "close")]
                 self.assertEqual(indices, sorted(indices))
             self.assertGreater(trace.index(("labels",)), trace.index(("close", self.dates[-1])))
             first = engine.tables["predictions"].copy()
@@ -73,33 +73,43 @@ class SkeletonTest(unittest.TestCase):
             pd.testing.assert_frame_equal(engine.tables["predictions"], first)
         self.assertIsNone(engine.data_provider._executor)
 
-    def test_default_placeholders_complete_without_component_replacements(self):
-        for prefetch, output in ((False, None), (True, self.root / "placeholder-output")):
+    def test_default_components_keep_suspended_assets_untraded(self):
+        for prefetch, output in ((False, None), (True, self.root / "component-output")):
             with self.subTest(prefetch=prefetch):
                 self.calls.clear()
                 engine = self.make_engine(initial_cash=123.0, prefetch=prefetch, output_dir=output)
                 metrics = engine.run()
-                self.assertEqual(metrics, dict.fromkeys(METRIC_NAMES))
+                self.assertEqual(set(metrics), set(METRIC_NAMES))
+                self.assertEqual(metrics["total_return"], 0.0)
+                self.assertEqual(metrics["transaction_cost"], 0.0)
+                self.assertEqual(metrics["failed_orders"], 4)
                 self.assertEqual(engine.trading_dates, self.dates)
                 self.assertEqual(self.calls, ["2018-01-02", "2018-01-04"])
                 self.assertEqual(engine.account["cash"], 123.0)
                 self.assertEqual(engine.account["portfolio_value"], 123.0)
                 self.assertEqual(len(engine.tables["predictions"]), 4)
                 self.assertTrue(engine.tables["predictions"].future_return.isna().all())
-                for name in ("rankic", "target_weights", "orders", "trades", "positions"):
+                self.assertEqual(len(engine.tables["rankic"]), 2)
+                self.assertTrue(engine.tables["rankic"].rankic.isna().all())
+                self.assertEqual(len(engine.tables["target_weights"]), 4)
+                self.assertEqual(len(engine.tables["orders"]), 4)
+                self.assertTrue(engine.tables["orders"].status.eq("REJECTED").all())
+                self.assertTrue(engine.tables["orders"].reject_reason.eq("SUSPENDED").all())
+                for name in ("trades", "positions"):
                     self.assertTrue(engine.tables[name].empty, name)
                 self.assertEqual(engine.tables["equity_curve"].date.tolist(), self.dates)
-                self.assertTrue(engine.tables["equity_curve"].portfolio_nav.isna().all())
-                self.assertTrue(engine.tables["equity_curve"].portfolio_return.isna().all())
+                self.assertTrue(engine.tables["equity_curve"].portfolio_nav.eq(1.0).all())
+                self.assertTrue(engine.tables["equity_curve"].portfolio_return.eq(0.0).all())
                 self.assertGreater(engine.performance["elapsed_seconds"], 0)
                 self.assertIsNone(engine.data_provider._executor)
                 if output is None:
                     self.assertEqual(engine.run(), metrics)
                 else:
                     records = [json.loads(line) for line in (output / "run.log").read_text(encoding="utf-8").splitlines()]
-                    self.assertTrue(any("STUB" in record["message"] for record in records))
+                    self.assertFalse(any("STUB" in record["message"] for record in records))
                     self.assertEqual(records[-1]["message"], "run completed")
-                    self.assertEqual({path.name for path in output.iterdir()}, {"run.log"})
+                    self.assertEqual({path.name for path in output.iterdir()},
+                                     {"run.log", "metrics.json", *(name + ".csv" for name in RESULT_COLUMNS)})
 
     def test_sync_and_async_inference_match_with_both_read_modes(self):
         for prefetch in (False, True):

@@ -1,6 +1,6 @@
 """Public data packets and names. No component or financial algorithm imports."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Generic, TypeAlias, TypeVar
 
@@ -8,14 +8,14 @@ import pandas as pd
 
 from .config import BacktestConfig, CostConfig, OptimizerConfig
 
-PROTOCOL_VERSION = "1"
+PROTOCOL_VERSION = "3"
 CacheKey: TypeAlias = str | tuple[str, int] | None
 T = TypeVar("T")
 
 
 class Phase(StrEnum):
     INITIALIZE = "INITIALIZE"
-    PRE_OPEN = "PRE_OPEN"
+    SETTLEMENT = "SETTLEMENT"
     OPEN_VALUE = "OPEN_VALUE"
     EXECUTION = "EXECUTION"
     CLOSE_VALUE = "CLOSE_VALUE"
@@ -30,7 +30,6 @@ class Phase(StrEnum):
 class ComponentRole(StrEnum):
     ENGINE = "engine"
     REFERENCE_DATA = "reference_data"
-    CORPORATE_ACTIONS = "corporate_actions"
     BROKER = "broker"
     ACCOUNTING = "accounting"
     RUNNER = "runner"
@@ -47,10 +46,8 @@ class Topic(StrEnum):
     RUN_CALENDAR = "run.calendar"
     ACCOUNT_INITIAL = "account.initial"
     MARKET_CONTEXT = "market.context"
-    REFERENCE_ACTIONS = "reference.actions"
     REFERENCE_BENCHMARK = "reference.benchmark"
     REFERENCE_PORTFOLIO = "reference.portfolio"
-    ACCOUNT_ACTIONS = "account.actions"
     ACCOUNT_SETTLED = "account.settled"
     ACCOUNT_OPEN = "account.open"
     EXECUTION_DAY = "execution.day"
@@ -106,10 +103,6 @@ class RunContext:
         return self.backtest.label_price_basis
 
     @property
-    def rights_policy(self):
-        return self.backtest.rights_policy
-
-    @property
     def data_capabilities(self):
         return self.backtest.data_capabilities
 
@@ -144,13 +137,6 @@ class InitialAccount:
     portfolio_value: float
     portfolio_nav: float
     benchmark_nav: float | None
-
-
-@dataclass(frozen=True)
-class ActionResult:
-    date: str
-    account: AccountState
-    events: pd.DataFrame
 
 
 @dataclass(frozen=True)
@@ -196,6 +182,10 @@ class PortfolioInputs:
     barra_exposures: Dataset[pd.DataFrame]
     benchmark_weights: Dataset[pd.DataFrame]
     industries: Dataset[pd.DataFrame]
+    factor_covariance: Dataset[pd.DataFrame] = field(
+        default_factory=lambda: Dataset("unavailable", None, "risk source not configured"))
+    specific_risk: Dataset[pd.DataFrame] = field(
+        default_factory=lambda: Dataset("unavailable", None, "risk source not configured"))
 
 
 @dataclass(frozen=True)
