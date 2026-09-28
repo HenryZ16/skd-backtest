@@ -13,7 +13,7 @@ from pandas.testing import assert_frame_equal
 
 from skd_backtest import BacktestEngine
 from skd_backtest.contracts import (
-    ComponentRole as Role, CostQuote, CostRequest, Dataset, ExecutionResult,
+    BenchmarkDay, ComponentRole as Role, CostQuote, CostRequest, Dataset, ExecutionResult,
     MarketContext, OpenSnapshot, CloseSnapshot, OutputReceipt, Phase, PredictionResult,
     RunCalendar, RunContext, TargetPlan, Topic,
 )
@@ -53,7 +53,7 @@ class RuntimeCacheTest(unittest.TestCase):
         self.views[Role.BROKER].publish(Topic.EXECUTION_DAY, day,
             ExecutionResult(day, self.state, empty_result("orders"), empty_result("trades"), 0.0, 0.0, signal))
         self.cache.advance(date=day, phase=Phase.CLOSE_VALUE)
-        self.views[Role.REFERENCE_DATA].publish(Topic.REFERENCE_BENCHMARK, day, Dataset("unavailable", None, "disabled"))
+        self.views[Role.REFERENCE_DATA].publish(Topic.REFERENCE_BENCHMARK, day, Dataset("available", BenchmarkDay(day, 0.0)))
         equity = pd.DataFrame([{"date": day, "cash": 100.0, "market_value": 0.0, "portfolio_value": 100.0,
                                "portfolio_nav": 1.0, "portfolio_return": 0.0, "turnover": 0.0, "transaction_cost": 0.0}],
                               columns=RESULT_COLUMNS["equity_curve"])

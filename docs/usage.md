@@ -185,7 +185,7 @@ top_k = 50
 <data_dir>/MarketData/<YYYY>/<MM>/<YYYYMM>.parquet
 <data_dir>/HS300_weight/<YYYY>/hs300_weight_<YYYY>.csv
 <data_dir>/HS300_industry/<YYYY>/hs300_industry_<YYYY>.csv
-<data_dir>/HS300_return/<YYYY>/hs300_return_<YYYY>.csv  # 启用 csi300 评价时需要
+<data_dir>/HS300_index/<YYYY>/hs300_index_<YYYY>.csv    # 必需指数日线，GBK / UTF-8
 ```
 
 `data` 是以 `Factor33_winsor`、`Barra_factor`、`MarketData` 为键的字典，
@@ -299,7 +299,6 @@ selected = engine.data_provider.valuation_inputs(codes=["SZ000001", "SH600000"])
 | `prefetch` | 布尔值 | `true` | 是否在后台预取下一批数据 |
 | `async_inference` | 布尔值 | `true` | 是否使用后台线程执行模型推理 |
 | `random_seed` | 整数 | `0` | 随机种子，范围为 0 至 4294967295 |
-| `benchmark_mode` | 字符串 | `"none"` | `"none"` 不计算相对指数绩效；`"csi300"` 使用 `HS300_return` 的历史指数收益 |
 | `label_price_basis` | 字符串 | `"adjusted_open"` | 预测标签价格口径，可选 `"adjusted_open"` 或 `"raw_open"` |
 | `friendly_output` | 布尔值 | `true` | 显示进度和结果表；命令行 `--friendly-output` / `--no-friendly-output` 可覆盖此值 |
 
@@ -308,10 +307,10 @@ TOML 模型目录由命令行 `--submission` 指定；优化器和费用分别�
 TOML 中省略可选字段即使用默认值，不写 `None` 或 `null`。
 
 数据配置统一为 `data_dir`，不再另设路径或能力声明。平台按实际目录、文件和字段判断可用性。
-启用 csi300 需要 HS300_return；Barra 需要 HS300_weight 和 Barra_factor，行业约束另需 HS300_industry。
-三个参考目录递归读取 CSV / Parquet；既支持标准列名，也支持下述权重和行业的原始中文格式。
+所有回测都需要 HS300_index；Barra 需要 HS300_weight 和 Barra_factor，行业约束另需 HS300_industry。
+参考目录递归读取 CSV / Parquet；既支持标准列名，也支持下述指数、权重和行业的原始中文格式。
 缺少必需目录、文件或字段时明确报错。
-按精确日期读取，不前向填充；benchmark_mode 只控制指数收益评价，不控制优化参考权重的读取。
+按精确日期读取，不前向填充；指数收益评价统一执行，优化参考权重按组合构建需求读取。
 完整字段及其关系见[接口协议](interfaces.md)。
 
 <a id="optimizer-config"></a>
@@ -354,11 +353,16 @@ alpha 为全部合法股票分数的平均并列百分位减 0.5，不截取 Top
 |---|---|
 | HS300_weight | date、code、benchmark_weight；或下述原始中文格式 |
 | HS300_industry（启用行业限制时） | date、code、industry；或下述原始中文格式 |
-| HS300_return（启用 csi300 评价时） | date、benchmark_return；需要覆盖全部回测交易日 |
+| HS300_index（所有回测必需） | 日期、代码、涨跌幅；也支持标准 date、benchmark_return |
 
-benchmark_mode=none 也能进行基准相对优化。若需超额收益、跟踪误差和信息比率，
-另设 benchmark_mode=csi300，并在 HS300_return 中提供每日 `date, benchmark_return` 的独立指数收益。
-优化权重不会被当作真实指数收益。benchmark_mode=none 时这三项指标为 None；启用 csi300 却缺少数据时明确报错。
+每次回测统一计算年化超额收益率、跟踪误差和信息比率，无需设置额外参数。
+HS300_index 原始日期为 YYYYMMDD，代码必须为 SH000300；
+`benchmark_return = 涨跌幅 / 100`，例如 -7.02 表示 -7.02%，转换为 -0.0702。
+直接使用每条记录的涨跌幅，保留回测首日和跨年度首日的真实收益；不使用对数收益，也不将首日填零。
+全部回测交易日必须各有一条有效记录，不补齐缺失日期。指数目录缺失或数据无效时直接报错。
+年化超额收益率为组合与指数各自年化收益率之差；跟踪误差和信息比率使用日超额收益的样本标准差，
+按 trading_days_per_year 年化（默认 252），不根据数据文件说明自动改成 243。
+优化权重不会被当作真实指数收益。缺少必需指数数据时明确报错，不能跳过指数评价。
 
 风格暴露直接使用当日 `Barra_factor` 中除日期、代码、名称外的全部因子列，无需配置因子名单；数据必须覆盖全部合法股票，且各因子值完整、有限。缺少必需来源或不可行约束明确失败。
 Barra 使用 SciPy [HiGHS 线性规划](https://docs.scipy.org/doc/scipy/reference/optimize.linprog-highs.html)。
@@ -424,7 +428,7 @@ HS300_industry 存在时自动读取，启用行业约束只需配置
 性能测试脚本显式关闭友好输出，保留 JSON 解析和性能测量方式。
 
 `engine.run()` 返回以下扁平字典，`engine.metrics` 保存该结果。
-None 表示没有有效样本、比率未定义或未启用基准。示例的模型分数全部相同，因此 RankIC 相关指标为 None；组合收益仍正常计算。
+None 表示没有有效样本或比率未定义。示例的模型分数全部相同，因此 RankIC 相关指标为 None；组合收益仍正常计算。
 数据、模型或协议发生真实错误时仍会抛出异常，并保持 metrics=None、tables/account 为空。
 
 | 键 | 规格指标 |

@@ -204,13 +204,12 @@ class SpecRegressionTests(unittest.TestCase):
                                       columns=["date", "code", "industry"]),
         }
         sources = {}
+        (self.root / "HS300_index" / "benchmark.csv").unlink()
         for name, table in tables.items():
             sources[name] = self.root / REFERENCE_DATASETS[name] / (name + ".parquet")
-            sources[name].parent.mkdir()
+            sources[name].parent.mkdir(exist_ok=True)
             table.to_parquet(sources[name], index=False)
         engine = self.engine(
-            benchmark_mode="csi300",
-
             optimizer_config=OptimizerConfig(method="barra",
                 active_weight_limit=.2, industry_exposure_limit=0.,
                 barra_style_exposure_limit=0., turnover_limit=1.),

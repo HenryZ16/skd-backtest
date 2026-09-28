@@ -24,12 +24,12 @@ class MemoryCache:
         self.values[(topic, key)] = value
 
 
-def _config(price_mode="adjusted_return", benchmark_mode="none", initial_cash=1_000):
+def _config(price_mode="adjusted_return", initial_cash=1_000):
     return BacktestConfig(
         data_dir=Path("."), start_date="2024-01-02", end_date="2024-01-03",
         initial_cash=initial_cash, rebalance_interval=1, holding_period=1, lookback=1,
         price_mode=price_mode, trading_days_per_year=252, risk_free_rate=0.0,
-        output_dir=None, benchmark_mode=benchmark_mode,
+        output_dir=None,
     )
 
 
@@ -58,11 +58,11 @@ def _close_inputs(date, account, opening, execution, *, dates, initial_cash, ben
         (Topic.RUN_CALENDAR, None): _calendar(*dates),
         (Topic.ACCOUNT_INITIAL, None): InitialAccount(
             _account(account.price_mode, initial_cash, []), initial_cash, 1.0,
-            1.0 if benchmark is not None else None,
+            1.0,
         ),
         (Topic.ACCOUNT_OPEN, date): opening,
         (Topic.EXECUTION_DAY, date): execution,
-        (Topic.REFERENCE_BENCHMARK, date): benchmark or Dataset("unavailable", None, "disabled"),
+        (Topic.REFERENCE_BENCHMARK, date): benchmark or Dataset("available", BenchmarkDay(date, 0.0)),
     }
     if previous_close is not None:
         previous_date, snapshot = previous_close
@@ -173,7 +173,7 @@ class TestPortfolioAccounting(unittest.TestCase):
 
     def test_cost_turnover_daily_return_and_benchmark_nav_compound_from_cache(self):
         first, second = "2024-01-02", "2024-01-03"
-        accounting = PortfolioAccounting(_config(benchmark_mode="csi300"))
+        accounting = PortfolioAccounting(_config())
 
         empty = _account("adjusted_return", 1_000, [])
         cache = MemoryCache({
@@ -246,13 +246,13 @@ class TestPortfolioAccounting(unittest.TestCase):
         self.assertEqual(row["market_value"], 0.0)
         self.assertEqual(row["portfolio_value"], 1_000.0)
         self.assertEqual(row["portfolio_return"], 0.0)
-        self.assertTrue(pd.isna(row["benchmark_nav"]))
-        self.assertTrue(pd.isna(row["benchmark_return"]))
-        self.assertTrue(pd.isna(row["active_return"]))
+        self.assertEqual(row["benchmark_nav"], 1.0)
+        self.assertEqual(row["benchmark_return"], 0.0)
+        self.assertEqual(row["active_return"], 0.0)
         self.assertEqual(row["turnover"], 0.0)
         self.assertEqual(row["transaction_cost"], 0.0)
 
-    def test_enabled_benchmark_rejects_missing_or_invalid_inputs(self):
+    def test_benchmark_rejects_missing_or_invalid_inputs(self):
         date = "2024-01-02"
         cases = (
             (Dataset("unavailable", None, "benchmark source missing"), 1.0,
@@ -276,7 +276,7 @@ class TestPortfolioAccounting(unittest.TestCase):
                     )
                 with self.assertRaisesRegex(ValueError, message):
                     _mark_close(
-                        PortfolioAccounting(_config(benchmark_mode="csi300")), cache, date,
+                        PortfolioAccounting(_config()), cache, date,
                         pd.DataFrame(columns=["code"]),
                     )
 

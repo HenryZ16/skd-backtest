@@ -38,8 +38,9 @@ naive 模型为当日全部沪深300成分股统一输出零分，`top_k=300` �
 使用现有 `D:\Data` 的 Barra 约束示例见 [examples/barra_usage.py](examples/barra_usage.py)。
 Barra 所需的 SciPy 随包默认安装；运行该示例即可使用已有风格暴露、权重和行业数据构建组合。
 `OptimizerConfig(method="barra")` 统一执行约束优化，没有内部模式选择。
-指数日收益放在 `data_dir/HS300_return`，启用 `benchmark_mode="csi300"` 时读取。
-默认 `benchmark_mode="none"` 不计算相对指数的绩效指标，仍可进行组合优化。
+每次回测统一从 `data_dir/HS300_index` 读取沪深300指数日线，
+将原始 `涨跌幅`（百分数）除以 100，计算年化超额收益率、跟踪误差和信息比率。
+指数数据是回测必需输入，缺少目录、日期或有效收益时直接报错；无需额外配置。
 
 `BacktestEngine` 也支持传入 `submission_dir`，由平台加载标准提交并管理每次评测的模型实例。
 完整配置、参考数据与可复现性约定见[使用说明](docs/usage.md)。

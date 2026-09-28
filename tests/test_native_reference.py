@@ -1,5 +1,4 @@
 """Native reference ingestion, normalization and exact historical coverage."""
-from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -29,7 +28,7 @@ class NativeReferenceTests(unittest.TestCase):
             original = path.read_bytes()
             for source in (root,):
                 with self.subTest(source=source):
-                    provider = ReferenceDataProvider(make_config(mode="none", data_dir=source))
+                    provider = ReferenceDataProvider(make_config(data_dir=source))
                     cache = MemoryCache(market_context())
                     provider.prepare_signal(date="2024-01-03", cache=cache)
                     actual = cache.values[Topic.REFERENCE_PORTFOLIO, "2024-01-03"].benchmark_weights.data
@@ -57,7 +56,7 @@ class NativeReferenceTests(unittest.TestCase):
                 paths.append(path)
             originals = [path.read_bytes() for path in paths]
             for source in [root]:
-                provider = ReferenceDataProvider(make_config(mode="none", data_dir=source))
+                provider = ReferenceDataProvider(make_config(data_dir=source))
                 slices = provider._load("industries")
                 dates = list(slices) if source == root else [next(iter(slices))]
                 for date in dates:
@@ -95,10 +94,72 @@ class NativeReferenceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "duplicate keys"):
                 ReferenceDataProvider(make_config(data_dir=root))._load("benchmark_weights")
 
+    def test_native_index_percentages_keep_first_day_and_year_boundaries(self):
+        for suffix, encoding in (("csv", "gbk"), ("csv", "utf-8-sig"), ("parquet", None)):
+            with self.subTest(suffix=suffix, encoding=encoding), TemporaryDirectory() as directory:
+                root = Path(directory)
+                originals = {}
+                for day, percentage in ((20231229, -7.02), (20240102, 1.25)):
+                    path = root / "HS300_index" / str(day // 10000) / f"index.{suffix}"
+                    path.parent.mkdir(parents=True)
+                    frame = pd.DataFrame({"日期": [day], "代码": ["SH000300"],
+                                          "名称": ["沪深300"], "涨跌幅": [percentage]})
+                    if suffix == "csv":
+                        frame.to_csv(path, encoding=encoding, index=False)
+                    else:
+                        frame.to_parquet(path, index=False)
+                    originals[path] = path.read_bytes()
+                config = make_config(data_dir=root)
+                config.validate_data(OptimizerConfig())
+                provider = ReferenceDataProvider(config)
+                cache = MemoryCache()
+                for day, expected in (("2023-12-29", -.0702), ("2024-01-02", .0125)):
+                    provider.prepare_close(date=day, cache=cache)
+                    self.assertAlmostEqual(
+                        cache.values[Topic.REFERENCE_BENCHMARK, day].data.benchmark_return, expected)
+                with self.assertRaisesRegex(ValueError, "no data for 2024-01-03"):
+                    provider.prepare_close(date="2024-01-03", cache=cache)
+                for path, original in originals.items():
+                    self.assertEqual(path.read_bytes(), original)
+
+    def test_invalid_native_index_is_rejected(self):
+        valid = pd.DataFrame({"日期": [20240102], "代码": ["SH000300"], "涨跌幅": [1.]})
+        cases = [
+            (valid.assign(代码="SH000001"), "SH000300"),
+            (valid.assign(代码=None), "SH000300"),
+            (valid.assign(日期="2024-01-02"), "YYYYMMDD"),
+            (valid.assign(涨跌幅="bad"), "numeric percentages"),
+            (valid.assign(涨跌幅=True), "numeric percentages"),
+            (valid.assign(涨跌幅=float("inf")), "finite"),
+            (valid.assign(涨跌幅=float("nan")), "finite"),
+            (valid.assign(涨跌幅=-101.), "at least -1"),
+            (valid.drop(columns="涨跌幅"), "missing required columns"),
+            (pd.concat([valid, valid], ignore_index=True), "duplicate keys"),
+        ]
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            index = root / "HS300_index"
+            index.mkdir()
+            for frame, message in cases:
+                with self.subTest(message=message):
+                    frame.to_parquet(index / "index.parquet", index=False)
+                    with self.assertRaisesRegex(ValueError, message):
+                        ReferenceDataProvider(make_config(data_dir=root)).prepare_close(
+                            date="2024-01-02", cache=MemoryCache())
+
     def test_required_directories_follow_selected_features(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            config = make_config(mode="none", data_dir=root)
+            obsolete = root / "HS300_return"
+            obsolete.mkdir()
+            pd.DataFrame({"date": ["2024-01-02"], "benchmark_return": [.01]}).to_csv(
+                obsolete / "returns.csv", index=False)
+            config = make_config(data_dir=root)
+            with self.assertRaisesRegex(ValueError, "HS300_index"):
+                config.validate_data(OptimizerConfig())
+            with self.assertRaisesRegex(ValueError, "HS300_index"):
+                ReferenceDataProvider(config).prepare_close(date="2024-01-02", cache=MemoryCache())
+            (root / "HS300_index").mkdir()
             config.validate_data(OptimizerConfig())
             with self.assertRaisesRegex(ValueError, "HS300_weight"):
                 config.validate_data(OptimizerConfig(method="barra"))
@@ -106,8 +167,6 @@ class NativeReferenceTests(unittest.TestCase):
             config.validate_data(OptimizerConfig(method="barra"))
             with self.assertRaisesRegex(ValueError, "HS300_industry"):
                 config.validate_data(OptimizerConfig(method="barra", industry_exposure_limit=.02))
-            with self.assertRaisesRegex(ValueError, "HS300_return"):
-                replace(config, benchmark_mode="csi300").validate_data(OptimizerConfig(method="barra"))
 
 
 if __name__ == "__main__":

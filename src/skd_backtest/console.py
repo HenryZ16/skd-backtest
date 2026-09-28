@@ -93,7 +93,7 @@ class ConsoleReporter:
                 lines.append(border)
         lines.append(border)
         if any(value is None for value in metrics.values()):
-            lines.append("N/A：样本不足、指标未定义或未启用基准。")
+            lines.append("N/A：样本不足或指标未定义。")
         if output_dir is not None:
             lines.append(f"结果目录：{Path(output_dir).resolve()}")
         print("\n".join(lines), flush=True)

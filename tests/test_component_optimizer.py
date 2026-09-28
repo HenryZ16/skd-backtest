@@ -41,7 +41,6 @@ def make_cache(
     codes=("A", "B", "C"),
     held=("OLD",),
     benchmark_weights=None,
-    benchmark_mode="none",
     signal_date="2024-01-03",
 ):
     dates = ("2024-01-02", signal_date, "2024-01-04")
@@ -81,7 +80,6 @@ def make_cache(
         trading_days_per_year=252,
         risk_free_rate=0.0,
         output_dir=None,
-        benchmark_mode=benchmark_mode,
 
     )
     packets = {
@@ -150,7 +148,6 @@ class PortfolioOptimizerTests(unittest.TestCase):
     def test_unavailable_benchmark_weights_are_never_replaced_by_equal_weights(self):
         cache, dates = make_cache(
             {"A": 1.0, "B": 2.0, "C": 3.0},
-            benchmark_mode="csi300",
         )
         with self.assertRaisesRegex(ValueError, "benchmark weights are unavailable"):
             PortfolioOptimizer(OptimizerConfig(method="barra")).optimize(

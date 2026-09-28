@@ -222,22 +222,20 @@ class PortfolioAccounting:
         portfolio_return = portfolio_value / previous_value - 1.0
 
         benchmark_data = cache.read(Topic.REFERENCE_BENCHMARK, date)
-        benchmark_return = benchmark_nav = active_return = None
-        if self.config.benchmark_mode != "none":
-            if benchmark_data.status != "available":
-                raise ValueError(f"benchmark data unavailable on {date}: {benchmark_data.reason}")
-            benchmark = benchmark_data.data
-            if not isinstance(benchmark, BenchmarkDay) or benchmark.date != date:
-                raise ValueError(f"invalid benchmark data on {date}")
-            benchmark_return = _number(benchmark.benchmark_return)
-            if benchmark_return is None or benchmark_return < -1:
-                raise ValueError(f"invalid benchmark return on {date}")
-            if previous_benchmark_nav is None or previous_benchmark_nav < 0:
-                raise ValueError(f"missing prior benchmark NAV on {date}")
-            benchmark_nav = previous_benchmark_nav * (1.0 + benchmark_return)
-            if not isfinite(benchmark_nav):
-                raise ValueError(f"invalid benchmark NAV on {date}")
-            active_return = portfolio_return - benchmark_return
+        if benchmark_data.status != "available":
+            raise ValueError(f"benchmark data unavailable on {date}: {benchmark_data.reason}")
+        benchmark = benchmark_data.data
+        if not isinstance(benchmark, BenchmarkDay) or benchmark.date != date:
+            raise ValueError(f"invalid benchmark data on {date}")
+        benchmark_return = _number(benchmark.benchmark_return)
+        if benchmark_return is None or benchmark_return < -1:
+            raise ValueError(f"invalid benchmark return on {date}")
+        if previous_benchmark_nav is None or previous_benchmark_nav < 0:
+            raise ValueError(f"missing prior benchmark NAV on {date}")
+        benchmark_nav = previous_benchmark_nav * (1.0 + benchmark_return)
+        if not isfinite(benchmark_nav):
+            raise ValueError(f"invalid benchmark NAV on {date}")
+        active_return = portfolio_return - benchmark_return
 
         turnover = _number(execution.trade_value)
         opening_value = _number(opening.portfolio_value)

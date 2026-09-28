@@ -8,7 +8,7 @@ from typing import Literal
 
 
 REFERENCE_DATASETS = {
-    "benchmark_returns": "HS300_return",
+    "benchmark_returns": "HS300_index",
     "benchmark_weights": "HS300_weight",
     "industries": "HS300_industry",
 }
@@ -61,7 +61,6 @@ class BacktestConfig:
     prefetch: bool = True
     async_inference: bool = True
     random_seed: int = 0
-    benchmark_mode: Literal["none", "csi300"] = "none"
     label_price_basis: Literal["adjusted_open", "raw_open"] = "adjusted_open"
     friendly_output: bool = True
 
@@ -91,16 +90,13 @@ class BacktestConfig:
             raise TypeError("friendly_output must be a boolean")
         for name, allowed in (
             ("price_mode", ("adjusted_return", "raw_price")),
-            ("benchmark_mode", ("none", "csi300")),
             ("label_price_basis", ("adjusted_open", "raw_open")),
         ):
             if getattr(self, name) not in allowed:
                 raise ValueError(f"invalid {name}")
 
     def validate_data(self, optimizer: OptimizerConfig) -> None:
-        references = []
-        if self.benchmark_mode == "csi300":
-            references.append("benchmark_returns")
+        references = ["benchmark_returns"]
         if optimizer.method == "barra":
             references.append("benchmark_weights")
         if optimizer.industry_exposure_limit is not None:

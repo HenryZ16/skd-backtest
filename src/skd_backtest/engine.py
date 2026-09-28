@@ -41,7 +41,6 @@ class BacktestEngine:
         friendly_output: bool = True,
         read_batch_months: int = 12, prefetch: bool = True, async_inference: bool = True,
         random_seed: int = 0,
-        benchmark_mode: Literal["none", "csi300"] = "none",
         label_price_basis: Literal["adjusted_open", "raw_open"] = "adjusted_open",
     ):
         self.config = BacktestConfig(
@@ -53,7 +52,7 @@ class BacktestEngine:
             friendly_output=friendly_output,
             read_batch_months=read_batch_months, prefetch=prefetch, async_inference=async_inference,
             random_seed=random_seed,
-            benchmark_mode=benchmark_mode, label_price_basis=label_price_basis,
+            label_price_basis=label_price_basis,
         )
         self.optimizer_config = optimizer_config or OptimizerConfig()
         self.cost_config = cost_config or CostConfig()

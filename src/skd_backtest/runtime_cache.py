@@ -109,8 +109,7 @@ class RuntimeCache:
         state = AccountState(context.price_mode, context.initial_cash,
                              pd.DataFrame(columns=STATE_COLUMNS[context.price_mode]),
                              pd.DataFrame(columns=LOCK_COLUMNS))
-        initial = InitialAccount(state, context.initial_cash, 1.0,
-                                 1.0 if context.benchmark_mode == "csi300" else None)
+        initial = InitialAccount(state, context.initial_cash, 1.0, 1.0)
         self._live = {(Topic.RUN_CONTEXT, None): self._context, (Topic.ACCOUNT_INITIAL, None): initial}
         self._calendar = None
         self._day_index = -1
@@ -348,10 +347,11 @@ class RuntimeCache:
             self._schema("universe", value.universe, ("code",))
             self._schema("barra", value.barra_exposures, ("date", "code"))
         elif topic == Topic.REFERENCE_BENCHMARK:
-            if value.status == "available":
-                if not isinstance(value.data, BenchmarkDay) or value.data.date != day:
-                    raise ValueError("benchmark must belong to the current close")
-                _number(value.data.benchmark_return)
+            if value.status != "available":
+                raise ValueError("benchmark data must be available")
+            if not isinstance(value.data, BenchmarkDay) or value.data.date != day:
+                raise ValueError("benchmark must belong to the current close")
+            _number(value.data.benchmark_return)
         elif topic == Topic.REFERENCE_PORTFOLIO:
             self._schema("universe", value.universe, ("code",))
             self._dataset("barra", value.barra_exposures, ("date", "code"))

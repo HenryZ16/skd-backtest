@@ -35,6 +35,10 @@ class SkeletonTest(unittest.TestCase):
                 pd.DataFrame(rows).to_parquet(folder / f"{month}.parquet", index=False)
         self.dates = ["2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05", "2018-01-08"]
         self.calls = []
+        benchmark = self.root / "HS300_index" / "benchmark.csv"
+        benchmark.parent.mkdir()
+        pd.DataFrame({"date": pd.to_datetime(pd.Series(self.dates).astype(str)).dt.strftime("%Y-%m-%d"),
+                      "benchmark_return": 0.0}).to_csv(benchmark, index=False)
 
     def inference(self, *, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
         self.calls.append(as_of_date)

@@ -47,6 +47,11 @@ class DataFlowTest(unittest.TestCase):
                 folder.mkdir(parents=True)
                 part.iloc[::-1].to_parquet(folder / f"{month}.parquet", index=False)
 
+        benchmark = self.root / "HS300_index" / "benchmark.csv"
+        benchmark.parent.mkdir()
+        pd.DataFrame({"date": pd.to_datetime(pd.Series(self.days).astype(str)).dt.strftime("%Y-%m-%d"),
+                      "benchmark_return": 0.0}).to_csv(benchmark, index=False)
+
     def make_engine(self, **kwargs):
         def inference(as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
             return pd.DataFrame({

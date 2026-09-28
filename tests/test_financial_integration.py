@@ -1,5 +1,8 @@
 """End-to-end acceptance with hand-computed prices and real components."""
 
+from contextlib import redirect_stdout
+from io import StringIO
+from statistics import mean, stdev
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import json
@@ -36,6 +39,10 @@ class FinancialIntegrationTest(unittest.TestCase):
             folder.mkdir(parents=True)
             pd.DataFrame(rows).to_parquet(folder / "201801.parquet", index=False)
         self.model_dates = []
+        benchmark = self.root / "HS300_index" / "benchmark.csv"
+        benchmark.parent.mkdir()
+        pd.DataFrame({"date": pd.to_datetime(pd.Series(self.dates).astype(str)).dt.strftime("%Y-%m-%d"),
+                      "benchmark_return": 0.0}).to_csv(benchmark, index=False)
 
     def inference(self, *, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
         self.model_dates.append(as_of_date)
@@ -114,7 +121,7 @@ class FinancialIntegrationTest(unittest.TestCase):
         self.assertIn("SH600000", last_positions.code.tolist())
         self.assertTrue(engine.tables["equity_curve"].cash.ge(-1e-8).all())
         self.assertEqual(engine.tables["rankic"].n_stocks.tolist(), [2, 2])
-        self.assertIsNone(metrics["tracking_error"])
+        self.assertIsNotNone(metrics["tracking_error"])
         # Both async and sequential inference must reproduce all audit results.
         engine_sync = self.engine(
             inference=inference, friendly_output=False, async_inference=False,
@@ -137,8 +144,8 @@ class FinancialIntegrationTest(unittest.TestCase):
         self.assertEqual(metrics["transaction_cost"], 0.0)
         self.assertEqual(metrics["failed_orders"], 0)
         self.assertEqual(set(metrics), set(METRIC_NAMES))
-        self.assertIsNone(metrics["annualized_excess_return"])
-        self.assertTrue(equity.benchmark_nav.isna().all())
+        self.assertEqual(metrics["annualized_excess_return"], metrics["annualized_return"])
+        self.assertTrue(equity.benchmark_nav.eq(1.0).all())
         self.assertEqual(engine.account["total_shares"], {})
         self.assertAlmostEqual(engine.account["position_values"]["SZ000001"], 1320.0)
         self.assertAlmostEqual(engine.account["cash"], 0.0)
@@ -267,24 +274,50 @@ class FinancialIntegrationTest(unittest.TestCase):
         self.assertAlmostEqual(engine.metrics["total_return"], 0.32)
         self.assertAlmostEqual(engine.metrics["turnover"], 3.0)
 
+    def test_native_index_reaches_metrics_audit_files_and_friendly_output(self):
+        path = self.root / "HS300_index" / "benchmark.csv"
+        pd.DataFrame({"日期": self.dates[:4], "代码": ["SH000300"] * 4,
+                      "涨跌幅": [-5., 2., -1., 3.]}).to_csv(path, encoding="gbk", index=False)
+        engine = self.engine(trading_days_per_year=4,
+                             output_dir=self.root / "index-output")
+        with redirect_stdout(StringIO()) as output:
+            metrics = engine.run()
+        equity = engine.tables["equity_curve"]
+        expected_returns = [-.05, .02, -.01, .03]
+        expected_active = [.05, .08, 1 / 11 + .01, .07]
+        pd.testing.assert_series_equal(equity.benchmark_return,
+                                       pd.Series(expected_returns, name="benchmark_return"))
+        pd.testing.assert_series_equal(equity.active_return,
+                                       pd.Series(expected_active, name="active_return"))
+        self.assertAlmostEqual(equity.benchmark_nav.iloc[0], .95)
+        self.assertAlmostEqual(equity.benchmark_nav.iloc[-1], .9880893)
+        self.assertAlmostEqual(metrics["annualized_excess_return"], .3319107)
+        self.assertAlmostEqual(metrics["tracking_error"], stdev(expected_active) * 2)
+        self.assertAlmostEqual(metrics["information_ratio"], mean(expected_active) / stdev(expected_active) * 2)
+        for label in ("年化超额收益率", "跟踪误差", "信息比率"):
+            row = next(line for line in output.getvalue().splitlines() if label in line)
+            self.assertNotIn("N/A", row)
+        saved = json.loads((engine.config.output_dir / "metrics.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved, metrics)
+        exported = pd.read_csv(engine.config.output_dir / "equity_curve.csv")
+        pd.testing.assert_series_equal(exported.benchmark_nav, equity.benchmark_nav)
+        pd.testing.assert_series_equal(equity.portfolio_nav,
+                                       pd.Series([1., 1.1, 1.2, 1.32], name="portfolio_nav"))
+
     def test_benchmark_directory_reloads_each_run(self):
-        path = self.root / "HS300_return" / "benchmark.parquet"
-        path.parent.mkdir()
+        path = self.root / "HS300_index" / "benchmark.csv"
         benchmark = pd.DataFrame({
             "date": ["2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05"],
             "benchmark_return": [0.01] * 4,
         })
-        benchmark.to_parquet(path, index=False)
-        engine = self.engine(
-            benchmark_mode="csi300",
-
-        )
+        benchmark.to_csv(path, index=False)
+        engine = self.engine()
         engine.run()
         first = engine.tables["equity_curve"]
         self.assertAlmostEqual(first.iloc[-1].benchmark_nav, 1.01 ** 4)
         self.assertAlmostEqual(first.iloc[0].active_return, -0.01)
         benchmark.loc[0, "benchmark_return"] = 0.02
-        benchmark.to_parquet(path, index=False)
+        benchmark.to_csv(path, index=False)
         engine.run()
         second = engine.tables["equity_curve"]
         self.assertAlmostEqual(second.iloc[-1].benchmark_nav, 1.02 * 1.01 ** 3)

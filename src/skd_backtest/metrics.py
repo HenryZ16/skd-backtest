@@ -135,11 +135,8 @@ class Metrics:
         )
         maximum_drawdown = _maximum_drawdown(nav_values) if days else None
 
-        benchmark_returns = _values(equity_curve["benchmark_return"])
-        benchmark_navs = _values(equity_curve["benchmark_nav"])
-        has_benchmark = bool(benchmark_returns or benchmark_navs)
         annualized_excess_return = tracking_error = information_ratio = None
-        if has_benchmark and days:
+        if days:
             benchmark_final_nav = _number(equity_curve["benchmark_nav"].iloc[-1])
             benchmark_annualized_return = _annualized_return(
                 benchmark_final_nav, days, self.trading_days_per_year

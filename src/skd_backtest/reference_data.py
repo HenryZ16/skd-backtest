@@ -136,15 +136,11 @@ class ReferenceDataProvider:
         return Dataset("available", data)
 
     def prepare_close(self, *, date: str, cache: CacheView) -> None:
-        if self.config.benchmark_mode == "none":
-            data = Dataset("unavailable", None, "benchmark_mode=none")
-        else:
-            source = self._external("benchmark_returns", date)
-            if source.status == "unavailable":
-                raise ValueError(source.reason)
-            else:
-                value = float(source.data["benchmark_return"].iloc[0])
-                data = Dataset("available", BenchmarkDay(date, value))
+        source = self._external("benchmark_returns", date)
+        if source.status == "unavailable":
+            raise ValueError(source.reason)
+        value = float(source.data["benchmark_return"].iloc[0])
+        data = Dataset("available", BenchmarkDay(date, value))
         cache.publish(Topic.REFERENCE_BENCHMARK, date, data)
 
     def prepare_signal(self, *, date: str, cache: CacheView) -> None:
@@ -187,7 +183,7 @@ def _is_iso_date(value: str) -> bool:
 
 
 def _read_source(path: Path, name: str) -> pd.DataFrame:
-    """Read canonical references or native HS300 weight/industry exports."""
+    """Read canonical references or native HS300 index/weight/industry exports."""
     if path.is_dir():
         files = sorted(file for file in path.rglob("*")
                        if file.is_file() and file.suffix.lower() in (".csv", ".parquet"))
@@ -204,9 +200,12 @@ def _read_source(path: Path, name: str) -> pd.DataFrame:
             frame = pd.read_csv(path, dtype=types, encoding="gb18030")
     else:
         raise ValueError(f"{name} source must be a CSV or Parquet file")
-    if "日期" in frame and name in ("benchmark_weights", "industries"):
+    if "日期" in frame and name in _REQUIRED_COLUMNS:
         names = {"日期": "date", "代码": "code", "名称": "name"}
-        if name == "benchmark_weights":
+        if name == "benchmark_returns":
+            required = {"日期", "代码", "涨跌幅"}
+            names["涨跌幅"] = "benchmark_return"
+        elif name == "benchmark_weights":
             required = {"日期", "代码", "权重", "指数成份日"}
             names.update({"权重": "benchmark_weight", "指数成份日": "snapshot_date", "权重来源": "source"})
         else:
@@ -221,4 +220,11 @@ def _read_source(path: Path, name: str) -> pd.DataFrame:
             if values.isna().any() or not values.str.fullmatch(r"[0-9]{8}").all():
                 raise ValueError(f"native {name} {column} must use YYYYMMDD")
             frame[column] = pd.to_datetime(values, format="%Y%m%d").dt.strftime("%Y-%m-%d")
+        if name == "benchmark_returns":
+            if frame["code"].isna().any() or not frame["code"].eq("SH000300").all():
+                raise ValueError("native benchmark_returns index code must be SH000300")
+            values = frame["benchmark_return"]
+            if not is_numeric_dtype(values.dtype) or is_bool_dtype(values.dtype):
+                raise ValueError("native benchmark_returns 涨跌幅 must be numeric percentages")
+            frame["benchmark_return"] = values / 100.0
     return frame

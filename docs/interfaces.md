@@ -192,7 +192,6 @@ INITIALIZE
 |---|---|
 | `initial_cash` | 有限正金额；整个运行的 NAV 分母 |
 | `price_mode` | `adjusted_return` 或 `raw_price`，全程固定 |
-| `benchmark_mode` | `none` 或 `csi300`；只控制指数收益与相对绩效评价，不控制组合参考权重 |
 | `label_price_basis` | `adjusted_open` 或 `raw_open`；默认 adjusted_open，各队伍必须统一 |
 | `data_dir` | 全部数据的根目录；市场及参考组件按固定子目录和实际字段读取、校验 |
 | `backtest.prefetch` | 默认 True，控制下一批行情读取预取 |
@@ -204,12 +203,12 @@ INITIALIZE
 `RunCalendar` 的确切字段为 `trading_dates: tuple[str, ...]` 和 `signal_calendar: DataFrame[signal_date, execution_date]`；由实际交易日序列和 rebalance_interval 生成，执行日必须是区间内下一交易日。Engine 读取 DataProvider.prepare 的结果后一次发布，逐日阶段开始前必须存在；金融组件不能修改日历。
 
 配置字段集中定义在 `config.py`。数据只有 data_dir 一个配置入口，文件布局见使用说明。
-参考数据固定对应 HS300_return、HS300_weight、HS300_industry；市场与标签读取按每个文件的实际字段选择价格来源。
+参考数据固定对应 HS300_index、HS300_weight、HS300_industry；市场与标签读取按每个文件的实际字段选择价格来源。
 具体文件读取方法不属于组件间协议；生产者必须输出第 7 节的标准结构。
 
 运行时按所选功能检查实际目录、文件和必需字段。真实价格模式需要真实 OHLC 或可恢复真实价格的复权因子、停牌状态和 PIT 限价；相关数据不能由后复权价格或固定涨跌停比例假造。未准备齐全时保持当前明确拒绝 raw_price 的行为。
 
-`benchmark_mode=none` 时，基准及依赖基准的绩效字段为空，但可使用已配置的历史权重进行 Barra 优化。`csi300` 时另需真实历史指数日收益。优化器只有 Top-K 和 Barra 两种；Barra 统一要求参考权重和风格暴露，启用行业限制时另需行业数据。缺少必需输入时直接报错，不静默忽略约束。
+每次回测必须提供沪深300历史指数日收益，统一计算指数净值和相对绩效，无需额外参数。优化器只有 Top-K 和 Barra 两种；Barra 统一要求参考权重和风格暴露，启用行业限制时另需行业数据。缺少必需输入时直接报错，不静默忽略约束。
 
 ## 6. 账户协议：阶段快照替代共享可变字典
 
@@ -242,12 +241,12 @@ locked_lots
 
 | 数据包 | 确切字段 |
 |---|---|
-| InitialAccount | `account: AccountState, portfolio_value: float, portfolio_nav: float, benchmark_nav: Optional[float]` |
+| InitialAccount | `account: AccountState, portfolio_value: float, portfolio_nav: float, benchmark_nav: float` |
 | OpenSnapshot | `date: str, account: AccountState, values: DataFrame, market_value: float, portfolio_value: float` |
 | ExecutionResult | `date: str, account: AccountState, orders: DataFrame, trades: DataFrame, trade_value: float, total_cost: float, executed_signal_date: Optional[str]` |
 | CloseSnapshot | `date: str, account: AccountState, positions: DataFrame, equity_curve: DataFrame, actual_weights: DataFrame` |
 
-InitialAccount 的 portfolio_value=initial_cash、portfolio_nav=1；基准启用时 benchmark_nav=1，否则为空。OpenSnapshot.values 为 `code, price, price_date, market_value`，其 market_value 合计必须等于快照总市值。
+InitialAccount 的 portfolio_value=initial_cash、portfolio_nav=1、benchmark_nav=1。OpenSnapshot.values 为 `code, price, price_date, market_value`，其 market_value 合计必须等于快照总市值。
 
 ExecutionResult.trade_value、total_cost 必须分别等于其实际 trades 对应字段之和；无成交为 0。CloseSnapshot.equity_curve 必须恰好一行，下一日收益基准直接读取该行的 portfolio_value、portfolio_nav 和 benchmark_nav，不维护另一份可变的“上一收盘”变量。
 
@@ -287,13 +286,15 @@ Barra 暴露列沿用源表的因子名称，只将日期和代码规范为 date
 
 合法股票池只由该信号日成分确定。权重名单必须与该池完全一致，按日归一化后直接使用，不自动修补成分或权重。行业和暴露必须覆盖合法池；行业使用当日历史行业代码，不以显示名称作为分组键。输入权重不改变实际持仓或 RankIC 的股票池。
 
-Reference Data 从 data_dir 下固定目录递归读取 CSV / Parquet，权重和行业兼容原始年度中文文件。目录与标准列名分别为：
+Reference Data 从 data_dir 下固定目录递归读取 CSV / Parquet，指数、权重和行业兼容原始年度中文文件。目录与列名分别为：
 
 | 来源 | 必需列 |
 |---|---|
-| HS300_return | date、benchmark_return |
+| HS300_index | 日期、代码、涨跌幅；或标准 date、benchmark_return |
 | HS300_weight | date、code、benchmark_weight |
 | HS300_industry | date、code、industry |
+
+原始指数日期为 YYYYMMDD，代码必须为 SH000300，涨跌幅除以 100 转为 benchmark_return；每个回测日必须有唯一有效收益，保留首日收益。指数目录缺失或数据无效时直接报错。
 
 标准日期为 YYYY-MM-DD，代码保留市场前缀；原始权重和行业的 YYYYMMDD 日期由适配器转换，行业代码映射为 industry、行业名称保留为 industry_name、权重来源保留为 source。来源按精确日期取截面。输入权重有限非负、日合计正且有限，ReferenceData 仅按日期归一化，源文件不变。原始指数成份日与可选 snapshot_date 必须不晚于记录日，且每个记录日对应一个快照日。权重成分不一致、缺少必需日期/字段或行业/暴露输入缺少个股时直接报错；通用行业数据允许全市场覆盖，按合法池选择已有记录。
 
@@ -311,7 +312,7 @@ benchmark_return
 
 `benchmark_return` 是对应交易日的真实基准收盘日收益，包括回测首日相对上一交易日的收益。Reference Data 负责从真实指数数据取得该收益；Accounting 负责从初始基准 NAV=1 累积，避免两边同时归一化。
 
-当日基准收益到 CLOSE_VALUE 才发布。它与信号日的成分权重不同，不根据当前目标组合、实际持仓或简单等权股票收益代替。
+当日基准收益到 CLOSE_VALUE 才发布，reference.benchmark 必须为 available；缺少数据直接报错。它与信号日的成分权重不同，不根据当前目标组合、实际持仓或简单等权股票收益代替。
 
 ### 7.4 Scores 与 TargetPlan
 
@@ -329,7 +330,7 @@ weights: DataFrame[
 
 - 缓存键使用 execution_date，两个日期必须与 signal_calendar 相符。
 - Optimizer 读取同一信号日的 Scores、PortfolioInputs 和收盘实际权重，完成排名变换及配置约束。
-- 输出覆盖当日合法池与仍持有的调出股票的并集；调出股票 target_weight=0，其 score 为空。未配置参考权重时 benchmark_weight 为空；其可用性独立于 benchmark_mode。
+- 输出覆盖当日合法池与仍持有的调出股票的并集；调出股票 target_weight=0，其 score 为空。未提供参考权重时 benchmark_weight 为空；指数日收益仍是必需数据。
 - 不允许负目标权重或股票权重和超过 1；若请求当前交易系统不支持的融资/卖空行为，应明确拒绝配置。
 - 未排期目标与空目标不同：无该 execution_date 的键表示不调仓；已发布空 weights 表表示明确清空股票目标，Broker 仍需处理现有持仓。
 - 每个目标只在指定下一开盘执行一次；失败订单不自动重试到其他交易日。Actual Portfolio 可以持续偏离 Target Portfolio。
@@ -527,7 +528,7 @@ CloseSnapshot 每交易日必须有一行 equity_curve；positions 按实际非�
 ### 11.3 每日核算与指标含义
 
 - 每日 portfolio_return 使用当前收盘权益与上日收盘权益；首日分母为 initial_cash。portfolio_nav 始终以 initial_cash 为分母。
-- 有基准时，active_return=portfolio_return-benchmark_return；基准缺失不能当作零收益。
+- 每个交易日均计算 active_return=portfolio_return-benchmark_return；基准缺失直接报错，不能当作零收益。
 - 每日成交统计采用双边成交金额口径：`turnover = sum(trades.trade_value) / 开盘交易前组合权益`；包括成功卖出和买入，不乘 1/2。Optimizer 的目标换手约束是独立配置语义，不使用该实际成交统计代替。
 - transaction_cost 为实际成交显式费用 total_cost 之和；滑点已反映在现金和收益中，不能再次相加。
 - 最终 turnover 为每日 turnover 之和；transaction_cost 为每日实际费用之和；failed_orders 仅计 REJECTED 行，部分成交由订单表审计。
@@ -537,7 +538,7 @@ CloseSnapshot 每交易日必须有一行 equity_curve；positions 按实际非�
 - 设 n 为回测交易日数（包括未成交日），Y 为 trading_days_per_year；Annualized Return 为期末 NAV^(Y/n)-1，Annualized Excess Return 为组合年化收益减基准年化收益。
 - Annualized Volatility 为日收益样本标准差 × sqrt(Y)；TE 为 active_return 样本标准差 × sqrt(Y)，IR 为 active_return 均值 / 样本标准差 × sqrt(Y)。
 - Sharpe 使用按 (1+risk_free_rate)^(1/Y)-1 换算的日无风险收益，日超额收益均值 / 日收益样本标准差 × sqrt(Y)。有效样本的波动率可以为 0，作为比率分母的零或浮点近零标准差则使比率未定义。
-- 无足够样本或零方差使指标未定义时返回 None；benchmark_mode=none 时基准相关指标为 None。无交易日区间的收益、风险、RankIC 指标为 None，交易次数/换手/费用合计为 0。
+- 无足够样本或零方差使指标未定义时返回 None。无交易日区间的收益、风险、RankIC 指标为 None，交易次数/换手/费用合计为 0。
 - Metrics 不读取原始价格、不修改核算结果，不内置最终排行榜权重。
 
 `evaluation.metrics` 必须含以下 15 个键，不增设排行榜加权分数：

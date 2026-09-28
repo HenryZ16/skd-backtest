@@ -95,10 +95,6 @@ class RunContext:
         return self.backtest.price_mode
 
     @property
-    def benchmark_mode(self):
-        return self.backtest.benchmark_mode
-
-    @property
     def label_price_basis(self):
         return self.backtest.label_price_basis
 
@@ -128,7 +124,7 @@ class InitialAccount:
     account: AccountState
     portfolio_value: float
     portfolio_nav: float
-    benchmark_nav: float | None
+    benchmark_nav: float
 
 
 @dataclass(frozen=True)

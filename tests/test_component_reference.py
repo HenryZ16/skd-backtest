@@ -22,12 +22,12 @@ class MemoryCache:
         self.values[topic, key] = value
 
 
-def make_config(*, data_dir=".", mode="csi300"):
+def make_config(*, data_dir="."):
     return BacktestConfig(
         data_dir=data_dir, start_date="2024-01-02", end_date="2024-01-04",
         initial_cash=1000.0, rebalance_interval=1, holding_period=1, lookback=1,
         price_mode="adjusted_return", trading_days_per_year=252, risk_free_rate=0.0,
-        output_dir=None, benchmark_mode=mode,
+        output_dir=None,
     )
 
 
@@ -121,19 +121,18 @@ class ReferenceDataProviderTests(unittest.TestCase):
                     self.assertAlmostEqual(weights.benchmark_weight.iloc[0], expected)
                 self.assertEqual(path.read_bytes(), original)
 
-    def test_missing_directories_and_disabled_benchmark(self):
+    def test_missing_or_invalid_benchmark_fails_and_weights_remain_optional(self):
         with tempfile.TemporaryDirectory() as directory:
             market = market_context()
             cache = MemoryCache(market)
-            with self.assertRaisesRegex(ValueError, "HS300_return"):
+            with self.assertRaisesRegex(ValueError, "HS300_index"):
                 ReferenceDataProvider(make_config(data_dir=directory)).prepare_close(date=market.date, cache=cache)
-            # Even an invalid return file is ignored when index evaluation is disabled.
             path = source_path(Path(directory), "returns")
             path.write_text("invalid", encoding="utf-8")
-            provider = ReferenceDataProvider(make_config(data_dir=directory, mode="none"))
-            provider.prepare_close(date=market.date, cache=cache)
+            provider = ReferenceDataProvider(make_config(data_dir=directory))
+            with self.assertRaisesRegex(ValueError, "missing required columns"):
+                provider.prepare_close(date=market.date, cache=cache)
             provider.prepare_signal(date=market.date, cache=cache)
-            self.assertEqual(cache.values[Topic.REFERENCE_BENCHMARK, market.date].reason, "benchmark_mode=none")
             inputs = cache.values[Topic.REFERENCE_PORTFOLIO, market.date]
             self.assertEqual(inputs.benchmark_weights.status, "unavailable")
             self.assertEqual(inputs.industries.status, "unavailable")

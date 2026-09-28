@@ -15,7 +15,7 @@
 后复权模式以资产金额记账，真实价格模式以股数和真实价格记账；两种模式共享组件接口。
 优化器只提供 Top-K 和 Barra 两种选择。Barra 使用已有暴露、参考权重和历史行业，统一执行
 行业/风格/主动权重/换手约束下的排名分数优化；缺少必需输入或约束不可行时明确失败。
-优化参考权重和指数收益评价独立，benchmark_mode=none 仍可优化。现货账户不支持卖空，long_only=False 明确拒绝。
+所有回测统一读取沪深300指数日收益并评价相对绩效，缺少指数数据明确失败；优化参考权重独立读取。现货账户不支持卖空，long_only=False 明确拒绝。
 独立 `DataProvider.playback()` 同样可用，不需要调整基本示例的调用方式。
 
 ## 市场数据流
@@ -121,7 +121,9 @@ Broker 不持有 Cost Model，Engine 不解释费用或修改账户。
 
 未发布、合法空表、`Dataset(status="unavailable", ...)` 分别表达尚无结果、
 已完成且为空、数据源不可用，不可混用。数据根目录缺少必要来源或约束输入时明确失败。
-Reference Data 从 data_dir/HS300_return、HS300_weight、HS300_industry 懒读 CSV/Parquet，
+Reference Data 从 data_dir 下的 HS300_index、HS300_weight、HS300_industry 懒读 CSV/Parquet，
+指数来源固定为 HS300_index，目录缺失或数据无效时直接报错。
+原始指数日线验证 SH000300 代码，将 YYYYMMDD 日期规范化，并将涨跌幅百分数转换为小数日收益。
 首次加载验证固定结构、键和值；没有单独的来源路径或能力声明。
 权重和行业支持原始 HS300_weight / HS300_industry 年度 GBK CSV 目录。
 权重按日归一化，名单必须完整且恰好覆盖当日合法池；行业使用对应日期的行业代码，显示名称保留为附加字段。
