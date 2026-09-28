@@ -1,15 +1,22 @@
 """Immutable configuration shared by the engine and component contracts."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from math import isfinite
 from pathlib import Path
 from typing import Literal
 
 
+REFERENCE_DATASETS = {
+    "benchmark_returns": "HS300_return",
+    "benchmark_weights": "HS300_weight",
+    "industries": "HS300_industry",
+}
+
+
 @dataclass(frozen=True)
 class OptimizerConfig:
-    method: str = "top_k"
+    method: Literal["top_k", "barra"] = "top_k"
     top_k: int = 50
     long_only: bool = True
     fully_invested: bool = True
@@ -18,11 +25,6 @@ class OptimizerConfig:
     industry_exposure_limit: float | None = None
     barra_style_exposure_limit: float | None = None
     turnover_limit: float | None = None
-    risk_aversion: float = 1.0
-    barra_factors: tuple[str, ...] = (
-        "市值", "贝塔", "动量", "残差波动", "非线性市值",
-        "账面市值比", "流动性", "盈利", "成长", "杠杆",
-    )
 
 
 @dataclass(frozen=True)
@@ -40,39 +42,6 @@ class CostConfig:
     minimum_commission: float = 0.0
     slippage: float = 0.0
     fee_schedule: tuple[FeeScheduleEntry, ...] = ()
-
-
-@dataclass(frozen=True)
-class DataCapabilities:
-    """Declared source coverage; source adapters must verify actual availability."""
-
-    adjusted_prices: bool = True
-    raw_prices: bool = False
-    adjustment_factors: bool = False
-    price_limits: bool = False
-    suspension: bool = True
-    constituents: bool = True
-    barra_exposures: bool = True
-    benchmark_returns: bool = False
-    benchmark_weights: bool = False
-    industries: bool = False
-    factor_covariance: bool = False
-    specific_risk: bool = False
-
-
-@dataclass(frozen=True)
-class ReferenceSources:
-    benchmark_returns: Path | None = None
-    benchmark_weights: Path | None = None
-    industries: Path | None = None
-    factor_covariance: Path | None = None
-    specific_risk: Path | None = None
-
-    def __post_init__(self):
-        for name in self.__dataclass_fields__:
-            value = getattr(self, name)
-            if value is not None:
-                object.__setattr__(self, name, Path(value))
 
 
 @dataclass(frozen=True)
@@ -94,8 +63,6 @@ class BacktestConfig:
     random_seed: int = 0
     benchmark_mode: Literal["none", "csi300"] = "none"
     label_price_basis: Literal["adjusted_open", "raw_open"] = "adjusted_open"
-    data_capabilities: DataCapabilities = field(default_factory=DataCapabilities)
-    reference_sources: ReferenceSources = field(default_factory=ReferenceSources)
     friendly_output: bool = True
 
     def __post_init__(self):
@@ -129,37 +96,16 @@ class BacktestConfig:
         ):
             if getattr(self, name) not in allowed:
                 raise ValueError(f"invalid {name}")
-        if not isinstance(self.data_capabilities, DataCapabilities):
-            raise TypeError("data_capabilities must be DataCapabilities")
-        if not isinstance(self.reference_sources, ReferenceSources):
-            raise TypeError("reference_sources must be ReferenceSources")
 
-    def validate_capabilities(self, optimizer: OptimizerConfig) -> None:
-        capabilities = self.data_capabilities
-        required = ["adjusted_prices", "suspension", "constituents"]
-        if self.price_mode == "raw_price" or self.label_price_basis == "raw_open":
-            if not (capabilities.raw_prices or capabilities.adjustment_factors):
-                raise NotImplementedError("raw_price requires raw OHLC/adjustment factors")
-        if self.price_mode == "raw_price":
-            required += ["price_limits"]
+    def validate_data(self, optimizer: OptimizerConfig) -> None:
+        references = []
         if self.benchmark_mode == "csi300":
-            required += ["benchmark_returns"]
-        needs_weights = (optimizer.method != "top_k" or optimizer.active_weight_limit is not None
-                         or optimizer.industry_exposure_limit is not None
-                         or optimizer.barra_style_exposure_limit is not None)
-        if needs_weights:
-            if self.benchmark_mode == "none":
-                raise ValueError("benchmark-relative optimization requires benchmark_mode=csi300")
-            required += ["benchmark_weights"]
+            references.append("benchmark_returns")
         if optimizer.method == "barra":
-            required += ["barra_exposures", "factor_covariance", "specific_risk"]
+            references.append("benchmark_weights")
         if optimizer.industry_exposure_limit is not None:
-            required += ["industries"]
-        if optimizer.barra_style_exposure_limit is not None:
-            required += ["barra_exposures"]
-        missing = [name for name in required if not getattr(capabilities, name)]
-        if missing:
-            raise ValueError("missing data capabilities: " + ", ".join(missing))
-        for name in ReferenceSources.__dataclass_fields__:
-            if getattr(capabilities, name) and getattr(self.reference_sources, name) is None:
-                raise ValueError(f"declared {name} capability requires a reference source")
+            references.append("industries")
+        for name in references:
+            path = self.data_dir / REFERENCE_DATASETS[name]
+            if not path.is_dir():
+                raise ValueError(f"{name} requires data directory: {path}")

@@ -2,7 +2,7 @@
 
 本文是组件间接口的独立设计依据，需求以 [只读开发规格](../BACKTEST_PLATFORM_SPEC_v2.md) 为准；现有实现状态见 [实现设计与开发](design.md)。
 
-**状态：公共接口协议版本 3，标准提交与正式优化器已接入。** 缓存、异步推理、组合构建、交易、费用、估值、外部参考数据、标签、评价及文件输出共用本文协议。实现与验收范围见实现设计文档。
+**状态：公共接口协议版本 5，标准提交与正式优化器已接入。** 缓存、异步推理、组合构建、交易、费用、估值、外部参考数据、标签、评价及文件输出共用本文协议。实现与验收范围见实现设计文档。
 
 ## 1. 交互边界
 
@@ -43,7 +43,7 @@ flowchart LR
     C --> W[Result Writer]
 ```
 
-参赛者的 `InferenceModel.predict(as_of_date, data)` 接口保持不变。Runner 的推理入口不访问缓存，发布入口只在主线程使用缓存；绝不把缓存、账户、组件句柄或标签传给参赛模型。
+参赛者接口为 `predict(self, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame`。Runner 的推理入口不访问缓存，发布入口只在主线程使用缓存；绝不把缓存、账户、组件句柄或标签传给参赛模型。
 
 ## 2. 通用数据约定
 
@@ -75,7 +75,7 @@ data: T | None
 reason: str | None
 ```
 
-`available` 必须携带数据对象，允许完整字段的空表，`reason=None`。`unavailable` 必须说明原因。一个已声明可用的数据源若缺失必需日期或关键记录，应抛出数据错误，不能逐日静默降级。股票停牌、单股行情缺失仍按行情字段表达，不等于整套数据源不可用。
+`available` 必须携带数据对象，允许完整字段的空表，`reason=None`。`unavailable` 必须说明原因。一个实际存在的数据源若缺失必需日期或关键记录，应抛出数据错误，不能逐日静默降级。股票停牌、单股行情缺失仍按行情字段表达，不等于整套数据源不可用。
 
 ## 3. RuntimeCache 接口
 
@@ -182,7 +182,7 @@ INITIALIZE
 - Label Provider 与 Evaluator 只能在逐日循环结束后读取全部分数历史；Evaluator 独占标签读取权限。
 - 每日 `execution.day` 必须发布，即使没有目标或全部订单被拒绝，也要发布保持账户不变、交易统计为零的合法结果。
 
-## 5. 运行参数与数据能力
+## 5. 运行参数与数据目录
 
 `RunContext` 以 `backtest: BacktestConfig`、`optimizer: OptimizerConfig`、`costs: CostConfig` 保存配置快照，并保存 protocol_version。实际运行日历单独发布到 run.calendar，使日志可以在读取日历之前开始记录。下表中的 initial_cash、price_mode 等配置项在 context 上作为对应配置的只读属性公开，不另存可发生分歧的第二份配置值。新增字段统一归入 BacktestConfig。
 
@@ -192,10 +192,9 @@ INITIALIZE
 |---|---|
 | `initial_cash` | 有限正金额；整个运行的 NAV 分母 |
 | `price_mode` | `adjusted_return` 或 `raw_price`，全程固定 |
-| `benchmark_mode` | `none` 或 `csi300`；当前缺少基准数据时用 none，不能冒充指数增强完整评测 |
+| `benchmark_mode` | `none` 或 `csi300`；只控制指数收益与相对绩效评价，不控制组合参考权重 |
 | `label_price_basis` | `adjusted_open` 或 `raw_open`；默认 adjusted_open，各队伍必须统一 |
-| `data_capabilities` | 真实价格/复权因子、限价、停牌、基准收益、基准权重、行业等数据源的可用性 |
-| `reference_sources` | 基准收益、权重、行业及风险参数的可选输入路径；源文件适配由 Reference Data 独占 |
+| `data_dir` | 全部数据的根目录；市场及参考组件按固定子目录和实际字段读取、校验 |
 | `backtest.prefetch` | 默认 True，控制下一批行情读取预取 |
 | `backtest.async_inference` | 默认 True，独立控制顺序推理线程；False 在 SIGNAL 同步调用 |
 | `backtest.friendly_output` | 默认 True，显示交易日进度和结果表；False 时引擎不主动打印进度或结果，评测入口向标准输出打印指标 JSON；不影响金融结果 |
@@ -204,11 +203,13 @@ INITIALIZE
 
 `RunCalendar` 的确切字段为 `trading_dates: tuple[str, ...]` 和 `signal_calendar: DataFrame[signal_date, execution_date]`；由实际交易日序列和 rebalance_interval 生成，执行日必须是区间内下一交易日。Engine 读取 DataProvider.prepare 的结果后一次发布，逐日阶段开始前必须存在；金融组件不能修改日历。
 
-配置字段已集中定义在 `config.py`，组件实现者只读，不各自修改共享配置类。DataCapabilities 的固定字段为 adjusted_prices、raw_prices、adjustment_factors、price_limits、suspension、constituents、barra_exposures、benchmark_returns、benchmark_weights、industries、factor_covariance、specific_risk；ReferenceSources 的字段为 benchmark_returns、benchmark_weights、industries、factor_covariance、specific_risk，值为 Path 或 None。数据能力声明不等于适配器已实现。具体数据文件的内部读取方法不属于组件间协议；生产者必须输出第 7 节的标准结构。
+配置字段集中定义在 `config.py`。数据只有 data_dir 一个配置入口，文件布局见使用说明。
+参考数据固定对应 HS300_return、HS300_weight、HS300_industry；市场与标签读取按每个文件的实际字段选择价格来源。
+具体文件读取方法不属于组件间协议；生产者必须输出第 7 节的标准结构。
 
-运行前必须校验所选模式及算法的数据能力。真实价格模式需要真实 OHLC 或可恢复真实价格的复权因子、停牌状态和 PIT 限价；相关数据不能由后复权价格或固定涨跌停比例假造。未准备齐全时保持当前明确拒绝 raw_price 的行为。
+运行时按所选功能检查实际目录、文件和必需字段。真实价格模式需要真实 OHLC 或可恢复真实价格的复权因子、停牌状态和 PIT 限价；相关数据不能由后复权价格或固定涨跌停比例假造。未准备齐全时保持当前明确拒绝 raw_price 的行为。
 
-`benchmark_mode=none` 时，基准及依赖基准的绩效字段为空，但组合自身指标可计算；benchmark tilt、主动权重约束及需要真实基准的正式优化不能启用。`csi300` 时必须有真实历史基准收益，启用基准组合构建时还必须有历史权重。行业或风险约束缺少必需输入时直接报错，不静默忽略约束。
+`benchmark_mode=none` 时，基准及依赖基准的绩效字段为空，但可使用已配置的历史权重进行 Barra 优化。`csi300` 时另需真实历史指数日收益。优化器只有 Top-K 和 Barra 两种；Barra 统一要求参考权重和风格暴露，启用行业限制时另需行业数据。缺少必需输入时直接报错，不静默忽略约束。
 
 ## 6. 账户协议：阶段快照替代共享可变字典
 
@@ -254,7 +255,9 @@ ExecutionResult.trade_value、total_cost 必须分别等于其实际 trades 对�
 
 开盘快照必须用开盘可见信息估值。它不能覆盖上一日 CloseSnapshot，日收益始终使用上日收盘权益；首日使用 InitialAccount.portfolio_value。市场价格未知且没有可用历史参考时，不允许把持仓按零估值，应抛出明确估值错误。
 
-raw_price 的逐股市值按真实股数与真实估值价格计算。adjusted_return 使用持仓对应的参考复权价格推进价值；Broker 新增的资产金额以本日开盘基准计入，再由 Accounting 在收盘推进。两种模式的估值不能交叉使用参考价。
+raw_price 的市值按真实股数与真实估值价格批量计算。adjusted_return 使用持仓对应的参考复权价格推进价值；Broker 新增的资产金额以本日开盘基准计入，再由 Accounting 在收盘推进。两种模式的估值不能交叉使用参考价。
+Accounting 按持仓代码对齐行情，通过数组 mask 排除停牌、缺价及非正/非有限价格。当前价格不可用时，批量比较账户参考价与历史行情日期；行情历史必须早于估值日，账户参考价允许为当日。日期相同时依次优先账户参考价、reference_close、previous_close；没有有效价格则报错。
+市值、收盘持仓及权重均按列计算，收盘复用已计算的价格和市值；总市值按原持仓顺序累计，保持浮点舍入和后续现金约束行为。
 
 各组件借用输入，不修改已经发布的对象。更新现金等标量时构造新的 AccountState 并共享未变表；需要改变持仓或锁定批次时，只复制并更新相应表，再发布下一阶段包。Accounting 不修改交易结果，Broker 不修改估值快照。
 
@@ -278,30 +281,26 @@ universe: DataFrame[code]
 barra_exposures: Dataset[DataFrame[date, code, 各 Barra 暴露列]]
 benchmark_weights: Dataset[DataFrame[date, code, benchmark_weight]]
 industries: Dataset[DataFrame[date, code, industry]]
-factor_covariance: Dataset[DataFrame[date, factor1, factor2, covariance]]
-specific_risk: Dataset[DataFrame[date, code, specific_variance]]
 ```
 
-Barra 暴露列沿用源表的因子名称，只将日期和代码规范为 date/code。行业和权重必须是信号时点已知的历史版本，不能使用未来调整公告或当期之外的成分。
+Barra 暴露列沿用源表的因子名称，只将日期和代码规范为 date/code。优化器排除 date、code、名称后，直接使用其余全部因子列，不接受因子名单配置。行业和权重必须是信号时点已知的历史版本，不能使用未来调整公告或当期之外的成分。
 
-合法股票池只由该信号日成分确定。基准权重、行业和暴露按 code 对齐；需使用的数据若缺失个股，不静默补等权、零暴露或未知行业。
+合法股票池只由该信号日成分确定。权重名单必须与该池完全一致，按日归一化后直接使用，不自动修补成分或权重。行业和暴露必须覆盖合法池；行业使用当日历史行业代码，不以显示名称作为分组键。输入权重不改变实际持仓或 RankIC 的股票池。
 
-外部来源由 ReferenceSources 指定单个 CSV 或 Parquet 文件，列名分别为：
+Reference Data 从 data_dir 下固定目录递归读取 CSV / Parquet，权重和行业兼容原始年度中文文件。目录与标准列名分别为：
 
 | 来源 | 必需列 |
 |---|---|
-| benchmark_returns | date、benchmark_return |
-| benchmark_weights | date、code、benchmark_weight |
-| industries | date、code、industry |
-| factor_covariance | date、factor1、factor2、covariance |
-| specific_risk | date、code、specific_variance |
+| HS300_return | date、benchmark_return |
+| HS300_weight | date、code、benchmark_weight |
+| HS300_industry | date、code、industry |
 
-外部日期统一为 YYYY-MM-DD，代码保留市场前缀。来源按精确日期取截面，不向前填充或推测历史版本；权重为非负有限小数，每日合法池内权重合计为 1。声明了来源但缺少必需日期、个股或字段时直接报错。
+标准日期为 YYYY-MM-DD，代码保留市场前缀；原始权重和行业的 YYYYMMDD 日期由适配器转换，行业代码映射为 industry、行业名称保留为 industry_name、权重来源保留为 source。来源按精确日期取截面。输入权重有限非负、日合计正且有限，ReferenceData 仅按日期归一化，源文件不变。原始指数成份日与可选 snapshot_date 必须不晚于记录日，且每个记录日对应一个快照日。权重成分不一致、缺少必需日期/字段或行业/暴露输入缺少个股时直接报错；通用行业数据允许全市场覆盖，按合法池选择已有记录。
 
 外部文件第一次使用时读取并校验一次，保留本次运行的只读源表及日期索引；每日仅选择所需截面。ReferenceDataProvider.close() 释放这些资源，Engine 在成功和失败时均调用，重复 run 必须重新读取来源文件。该读取状态属于来源资源管理，不保存或替代缓存中的账户及组件产物。
 
-风险参数同样必须在信号时点已知。正式优化器用配置的 Barra 暴露 X、完整因子协方差 F 与非负特异方差 D 组成 XFXᵀ+diag(D)。
-协方差要求对称、半正定，数据使用相同收益周期与单位。风险参数缺失不能填零；简单优化方法不依赖风险数据。
+Barra 约束优化器使用信号日的风格暴露 X、归一化权重 b 和历史行业分类控制组合偏离。
+风格限制按输入暴露的原始单位计算，不自动变更尺度。
 
 ### 7.3 BenchmarkDay
 
@@ -330,16 +329,16 @@ weights: DataFrame[
 
 - 缓存键使用 execution_date，两个日期必须与 signal_calendar 相符。
 - Optimizer 读取同一信号日的 Scores、PortfolioInputs 和收盘实际权重，完成排名变换及配置约束。
-- 输出覆盖当日合法池与仍持有的调出股票的并集；调出股票 target_weight=0，其 score 为空。未启用基准时 benchmark_weight 为空。
+- 输出覆盖当日合法池与仍持有的调出股票的并集；调出股票 target_weight=0，其 score 为空。未配置参考权重时 benchmark_weight 为空；其可用性独立于 benchmark_mode。
 - 不允许负目标权重或股票权重和超过 1；若请求当前交易系统不支持的融资/卖空行为，应明确拒绝配置。
 - 未排期目标与空目标不同：无该 execution_date 的键表示不调仓；已发布空 weights 表表示明确清空股票目标，Broker 仍需处理现有持仓。
 - 每个目标只在指定下一开盘执行一次；失败订单不自动重试到其他交易日。Actual Portfolio 可以持续偏离 Target Portfolio。
-- Top-K、benchmark tilt 和正式优化器共用上述输入输出协议；替换优化算法不得要求修改 Broker、Accounting 或 Metrics。
+- Top-K 和 Barra 约束优化器共用上述输入输出协议；替换优化算法不得要求修改 Broker、Accounting 或 Metrics。
 
-正式 method=barra 的目标为排名百分位减 0.5 得到的 alpha 收益减基准主动风险惩罚；risk_aversion 为正。
+method=barra 使用全部合法股票的平均并列排名百分位减 0.5 得到 alpha，统一在组合约束下最大化 alphaᵀ w，没有内部模式参数。
 单股上限约束 w，主动上限约束 abs(w-b)，行业/风格上限约束对应主动暴露，换手限制为 sum(abs(w-current))，含退池归零。
-满仓时 sum(w)=1，否则 sum(w)<=1；均不允许负权重。精确中性约束去除线性重复后求解，不可行或求解失败不发布目标。
-高级约束仅用于正式方法，简单方法不静默忽略。具体参数、求解容差与风险输入格式见使用说明。
+满仓时 sum(w)=1，否则 sum(w)<=1；均不允许负权重。精确中性限制以等式约束求解，不可行或求解失败不发布目标。
+主动权重、行业、风格和换手约束仅用于 Barra，Top-K 收到这些选项时明确报错。具体参数、求解容差与输入格式见使用说明。
 
 ## 8. Broker 与 Cost Model 的缓存交换
 
@@ -435,6 +434,9 @@ Broker 完成所有卖单、更新本地真实现金后才处理买单；全部�
 | ResultWriter | `output_dir: Path \| None` |
 
 账户运行状态放入缓存或单次调用的局部变量；构造参数为只读配置。Runner 独占参赛模型和私有随机状态。推理线程池、停止标记和有界日包队列由单次 inference_days 生成器持有，结束时回收。Broker 的生成器局部变量在本次调用结束时释放，Writer 的日志句柄和游标由 open/close 管理。金融组件构造函数不读取外部数据、不开始行情播放。标准提交加载入口会执行 inference.py 并初始化模型，加载失败直接抛出。
+Runner 的 infer 入口使用 Typeguard 装饰器，调用前检查 as_of_date: str 和 data: dict[str, DataFrame]，覆盖字典的全部键和值；模型结果按 DataFrame 标注自动检查，类型错误抛出 typeguard.TypeCheckError。
+用户函数无需继承类、添加装饰器或提供标注。构造阶段不执行推理或校验函数标注；关键字参数调用不兼容时，由 Python 在调用时抛出 TypeError。
+标准提交、直接传入 callable、同步及异步推理共用此入口；列结构检查仍只在首个信号执行。
 标准路径每次评测仅创建一个模型，重复 run 创建新实例；callable 路径内部状态由调用者管理。
 Runner 控制 Python/NumPy 传统随机源并恢复宿主状态，额外随机生成器/第三方非确定算法遵守提交可复现约定。
 
@@ -446,7 +448,7 @@ Accounting 的实际权重通过 CloseSnapshot.actual_weights 发布；初始账
 
 | 阶段 | Engine 的固定调用顺序 |
 |---|---|
-| INITIALIZE | 建立配置和缓存初始账户 → Result Writer.open → 校验数据能力 → DataProvider.prepare → 发布 run.calendar；日历读取失败也进入统一失败日志 |
+| INITIALIZE | 建立配置和缓存初始账户 → Result Writer.open → 检查必需参考目录 → DataProvider.prepare → 发布 run.calendar；日历读取失败也进入统一失败日志 |
 | SETTLEMENT | Broker.start_day：直接读取上一收盘账户（首日为初始账户），执行到期持仓解锁 |
 | OPEN_VALUE | Accounting.mark_at_open，只传当日开盘行情 |
 | EXECUTION | Broker.execute；每次让出后调用 Cost Model.calculate；没有目标也完成当日 ExecutionResult |
@@ -549,7 +551,7 @@ information_ratio, sharpe_ratio, turnover, transaction_cost, failed_orders
 
 `output.receipt` 为 `status: "written"|"disabled", output_dir: str|None, files: dict[str,str]`；files 从实际输出文件名映射至绝对路径。未配置目录时 status=disabled、output_dir=None、files 为空。正式文件写入失败时不发布 receipt。
 
-Result Writer 输出 metrics.json、七张 CSV 和 run.log。它只序列化已发布结果，不补标签、不重算收益或费用。run.log 包含协议版本、价格/标签/基准模式、配置、数据能力、阶段进度及失败信息；运行耗时等诊断值不参与金融结果的确定性判断。
+Result Writer 输出 metrics.json、七张 CSV 和 run.log。它只序列化已发布结果，不补标签、不重算收益或费用。run.log 包含协议版本、价格/标签/基准模式、配置、数据目录、阶段进度及失败信息；运行耗时等诊断值不参与金融结果的确定性判断。
 
 ## 12. 接口文件归属
 
@@ -572,7 +574,7 @@ Result Writer 输出 metrics.json、七张 CSV 和 run.log。它只序列化已�
 
 contracts.py 只声明数据包、主题、阶段和角色，不包含金融算法；runtime_cache.py 只实现缓存协议。各业务模块仅依赖协议、自己的配置及已有通用库，不相互导入业务类。需要私有辅助文件时放入本任务独占范围；同一 Broker 或 Optimizer 内的多种算法不自动成为可同时修改同一文件的任务。
 
-市场数据与参考数据分工按数据形态固定：真实/复权 OHLC、限价、停牌及价格参考属于市场流；基准、权重、行业和风险参数属于 Reference Data；事后价格读取及标签属于 Label Provider。Reference Data 和 Label Provider 不调用或修改正在播放的 DataProvider 实例。
+市场数据与参考数据分工按数据形态固定：真实/复权 OHLC、限价、停牌及价格参考属于市场流；基准、权重和行业属于 Reference Data；事后价格读取及标签属于 Label Provider。Reference Data 和 Label Provider 不调用或修改正在播放的 DataProvider 实例。
 
 接口接入已完成，共享协议、配置、表结构及 Engine 在业务并行阶段冻结为只读依赖；必要接口变更由唯一基础设施维护者统一修改。各组件已有独占文件和固定入口，不需要修改其他组件即可补全本文约定的金融行为。新增第三方依赖由基础设施维护者统一登记。组件专项测试和真实组件联调共同验证金融结果；协议替身继续用于检查阶段交接、计费与异常边界。集中联调由基础设施维护者负责，不要求组件任务共同修改同一测试文件。
 

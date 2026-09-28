@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from skd_backtest.config import BacktestConfig, CostConfig, DataCapabilities, OptimizerConfig
+from skd_backtest.config import BacktestConfig, CostConfig, OptimizerConfig
 from skd_backtest.contracts import RunContext, Topic
 from skd_backtest.label_provider import LabelProvider
 from skd_backtest.schemas import LABEL_COLUMNS
@@ -44,7 +44,7 @@ def market_row(day, code, adjusted_open, *, raw_open=None, factor=1.0, suspended
 
 def make_config(
     data_dir, *, start_date="2024-01-01", end_date="2024-01-31", holding_period=1,
-    basis="adjusted_open", raw_prices=False, adjustment_factors=False,
+    basis="adjusted_open",
 ):
     return BacktestConfig(
         data_dir=data_dir,
@@ -59,10 +59,6 @@ def make_config(
         risk_free_rate=0.0,
         output_dir=None,
         label_price_basis=basis,
-        data_capabilities=DataCapabilities(
-            raw_prices=raw_prices,
-            adjustment_factors=adjustment_factors,
-        ),
     )
 
 
@@ -74,6 +70,7 @@ def run_labels(data_dir, monthly_rows, scores, config):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"")
         frames[month] = pd.DataFrame(rows)
+        frames[month].to_parquet(path, index=False)
 
     calls = []
 
@@ -214,7 +211,6 @@ class LabelProviderTest(unittest.TestCase):
                 scores,
                 make_config(
                     temp_dir, end_date="2024-01-02", basis="raw_open",
-                    raw_prices=True, adjustment_factors=True,
                 ),
             )
             self.assertAlmostEqual(labels.loc[0, "future_return"], 0.2)
@@ -230,18 +226,34 @@ class LabelProviderTest(unittest.TestCase):
                 market_row("2024-01-03", "A", 100.0, factor=10.0),
                 market_row("2024-01-04", "A", 144.0, factor=12.0),
             ]
+            for row in rows:
+                row.pop("raw_open")
             labels, calls = run_labels(
                 temp_dir,
                 {(2024, 1): rows},
                 scores,
                 make_config(
                     temp_dir, end_date="2024-01-02", basis="raw_open",
-                    adjustment_factors=True,
                 ),
             )
             self.assertAlmostEqual(labels.loc[0, "future_return"], 0.2)
             endpoint_columns = [columns for _, columns, filters in calls if filters]
             self.assertTrue(all("adjustment_factor" in columns for columns in endpoint_columns))
+
+    def test_raw_labels_detect_each_endpoint_month_independently(self):
+        with tempfile.TemporaryDirectory() as directory:
+            scores = pd.DataFrame([{"date": "2024-01-30", "code": "A", "score": 1.}])
+            exit_row = market_row("2024-02-01", "A", 144., factor=12.)
+            exit_row.pop("raw_open")
+            months = {
+                (2024, 1): [market_row("2024-01-30", "A", 90., raw_open=9.),
+                            market_row("2024-01-31", "A", 100., raw_open=10.)],
+                (2024, 2): [exit_row],
+            }
+            labels, _ = run_labels(directory, months, scores,
+                                    make_config(directory, basis="raw_open"))
+            self.assertAlmostEqual(labels.loc[0, "future_return"], .2)
+            self.assertIsNone(labels.loc[0, "missing_reason"])
 
     def test_missing_required_month_is_an_error(self):
         with tempfile.TemporaryDirectory() as temp_dir:

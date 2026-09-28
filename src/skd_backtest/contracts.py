@@ -1,6 +1,6 @@
 """Public data packets and names. No component or financial algorithm imports."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Generic, TypeAlias, TypeVar
 
@@ -8,7 +8,7 @@ import pandas as pd
 
 from .config import BacktestConfig, CostConfig, OptimizerConfig
 
-PROTOCOL_VERSION = "3"
+PROTOCOL_VERSION = "5"
 CacheKey: TypeAlias = str | tuple[str, int] | None
 T = TypeVar("T")
 
@@ -102,14 +102,6 @@ class RunContext:
     def label_price_basis(self):
         return self.backtest.label_price_basis
 
-    @property
-    def data_capabilities(self):
-        return self.backtest.data_capabilities
-
-    @property
-    def reference_sources(self):
-        return self.backtest.reference_sources
-
 
 @dataclass(frozen=True)
 class RunCalendar:
@@ -182,10 +174,7 @@ class PortfolioInputs:
     barra_exposures: Dataset[pd.DataFrame]
     benchmark_weights: Dataset[pd.DataFrame]
     industries: Dataset[pd.DataFrame]
-    factor_covariance: Dataset[pd.DataFrame] = field(
-        default_factory=lambda: Dataset("unavailable", None, "risk source not configured"))
-    specific_risk: Dataset[pd.DataFrame] = field(
-        default_factory=lambda: Dataset("unavailable", None, "risk source not configured"))
+
 
 
 @dataclass(frozen=True)

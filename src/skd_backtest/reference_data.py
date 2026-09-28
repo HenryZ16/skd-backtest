@@ -1,13 +1,13 @@
 """Point-in-time benchmark and portfolio reference data."""
 
 from datetime import date as Date
-from math import fsum, isclose, isfinite
+from math import fsum, isfinite
 from pathlib import Path
 
 import pandas as pd
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
 
-from .config import BacktestConfig
+from .config import BacktestConfig, REFERENCE_DATASETS
 from .contracts import BenchmarkDay, Dataset, PortfolioInputs, Topic
 from .runtime_cache import CacheView
 
@@ -16,15 +16,11 @@ _REQUIRED_COLUMNS = {
     "benchmark_returns": ("date", "benchmark_return"),
     "benchmark_weights": ("date", "code", "benchmark_weight"),
     "industries": ("date", "code", "industry"),
-    "factor_covariance": ("date", "factor1", "factor2", "covariance"),
-    "specific_risk": ("date", "code", "specific_variance"),
 }
 _KEY_COLUMNS = {
     "benchmark_returns": ("date",),
     "benchmark_weights": ("date", "code"),
     "industries": ("date", "code"),
-    "factor_covariance": ("date", "factor1", "factor2"),
-    "specific_risk": ("date", "code"),
 }
 
 
@@ -40,21 +36,18 @@ class ReferenceDataProvider:
         if name in self._slices:
             return self._slices[name]
 
-        path = getattr(self.config.reference_sources, name)
-        if path is None:
-            if getattr(self.config.data_capabilities, name):
-                raise ValueError(f"{name} capability is declared but no source is configured")
+        path = self.config.data_dir / REFERENCE_DATASETS[name]
+        if not path.exists():
             return None
+        if not path.is_dir():
+            raise ValueError(f"{name} source must be a directory: {path}")
 
-        path = Path(path)
-        if path.suffix.lower() == ".csv":
-            frame = pd.read_csv(path, dtype={"date": "string", "code": "string"})
-        elif path.suffix.lower() == ".parquet":
-            frame = pd.read_parquet(path)
-        else:
-            raise ValueError(f"{name} source must be a CSV or Parquet file")
+        frame = _read_source(Path(path), name)
 
         self._validate(name, frame)
+        if name == "benchmark_weights":
+            totals = frame.groupby("date")["benchmark_weight"].transform("sum")
+            frame["benchmark_weight"] = frame["benchmark_weight"] / totals
         frame = frame.sort_values(list(_KEY_COLUMNS[name]), kind="stable", ignore_index=True)
         slices = {}
         dates = frame["date"].tolist()
@@ -97,13 +90,8 @@ class ReferenceDataProvider:
                 raise ValueError("industries must contain nonempty strings")
             return
 
-        if name == "factor_covariance":
-            for column in ("factor1", "factor2"):
-                if not all(isinstance(value, str) and value for value in frame[column]):
-                    raise ValueError("risk factor names must be nonempty strings")
         value_column = {
             "benchmark_returns": "benchmark_return", "benchmark_weights": "benchmark_weight",
-            "factor_covariance": "covariance", "specific_risk": "specific_variance",
         }[name]
         values = frame[value_column]
         if not is_numeric_dtype(values.dtype) or is_bool_dtype(values.dtype):
@@ -116,20 +104,32 @@ class ReferenceDataProvider:
             raise ValueError(f"{value_column} values must be finite numbers")
         if name == "benchmark_returns" and any(value < -1 for value in numeric):
             raise ValueError("benchmark returns must be at least -1")
-        if name == "specific_risk" and any(value < 0 for value in numeric):
-            raise ValueError("specific variances must be nonnegative")
         if name == "benchmark_weights":
+            if "snapshot_date" in frame:
+                snapshots = frame["snapshot_date"]
+                if snapshots.isna().any() or not all(
+                    isinstance(value, str) and _is_iso_date(value)
+                    for value in snapshots.drop_duplicates()
+                ):
+                    raise ValueError("weight snapshot dates must be YYYY-MM-DD strings")
+                if (snapshots > dates).any():
+                    raise ValueError("weight snapshot date must not be after its record date")
+                if frame.groupby("date").snapshot_date.nunique().gt(1).any():
+                    raise ValueError("weights must use one snapshot date per record date")
             if any(value < 0 for value in numeric):
                 raise ValueError("benchmark weights must be nonnegative")
             for _, daily in frame.groupby("date", sort=False):
-                if not isclose(fsum(float(value) for value in daily.benchmark_weight),
-                               1.0, rel_tol=0.0, abs_tol=1e-6):
-                    raise ValueError("benchmark weights must sum to one for each date")
+                try:
+                    total = fsum(float(value) for value in daily.benchmark_weight)
+                except OverflowError:
+                    total = float("inf")
+                if not isfinite(total) or total <= 0:
+                    raise ValueError("benchmark weights must have a positive finite sum for each date")
 
     def _external(self, name: str, date: str) -> Dataset:
         slices = self._load(name)
         if slices is None:
-            return Dataset("unavailable", None, f"{name} source is not configured")
+            return Dataset("unavailable", None, f"{name} directory is missing: {self.config.data_dir / REFERENCE_DATASETS[name]}")
         data = slices.get(date)
         if data is None:
             raise ValueError(f"{name} source has no data for {date}")
@@ -141,7 +141,7 @@ class ReferenceDataProvider:
         else:
             source = self._external("benchmark_returns", date)
             if source.status == "unavailable":
-                data = source
+                raise ValueError(source.reason)
             else:
                 value = float(source.data["benchmark_return"].iloc[0])
                 data = Dataset("available", BenchmarkDay(date, value))
@@ -152,13 +152,9 @@ class ReferenceDataProvider:
         universe = market.universe
         legal_codes = set(universe["code"])
 
-        weights = (
-            self._external("benchmark_weights", date)
-            if self.config.benchmark_mode == "csi300"
-            else Dataset("unavailable", None, "benchmark_mode=none")
-        )
+        weights = self._external("benchmark_weights", date)
         if weights.status == "available" and set(weights.data.code) != legal_codes:
-            raise ValueError("benchmark weights must cover the legal universe exactly once")
+            raise ValueError(f"benchmark weights must cover the legal universe exactly once on {date}")
 
         industries = self._external("industries", date)
         if industries.status == "available":
@@ -176,8 +172,6 @@ class ReferenceDataProvider:
             Dataset("available", market.barra_exposures),
             weights,
             industries,
-            self._external("factor_covariance", date),
-            self._external("specific_risk", date),
         ))
 
     def close(self) -> None:
@@ -190,3 +184,41 @@ def _is_iso_date(value: str) -> bool:
         return Date.fromisoformat(value).isoformat() == value
     except ValueError:
         return False
+
+
+def _read_source(path: Path, name: str) -> pd.DataFrame:
+    """Read canonical references or native HS300 weight/industry exports."""
+    if path.is_dir():
+        files = sorted(file for file in path.rglob("*")
+                       if file.is_file() and file.suffix.lower() in (".csv", ".parquet"))
+        if not files:
+            raise ValueError(f"{name} directory contains no CSV or Parquet files: {path}")
+        return pd.concat([_read_source(file, name) for file in files], ignore_index=True)
+    if path.suffix.lower() == ".parquet":
+        frame = pd.read_parquet(path)
+    elif path.suffix.lower() == ".csv":
+        types = {"date": "string", "code": "string", "代码": "string"}
+        try:
+            frame = pd.read_csv(path, dtype=types, encoding="utf-8-sig")
+        except UnicodeDecodeError:
+            frame = pd.read_csv(path, dtype=types, encoding="gb18030")
+    else:
+        raise ValueError(f"{name} source must be a CSV or Parquet file")
+    if "日期" in frame and name in ("benchmark_weights", "industries"):
+        names = {"日期": "date", "代码": "code", "名称": "name"}
+        if name == "benchmark_weights":
+            required = {"日期", "代码", "权重", "指数成份日"}
+            names.update({"权重": "benchmark_weight", "指数成份日": "snapshot_date", "权重来源": "source"})
+        else:
+            required = {"日期", "代码", "行业代码"}
+            names.update({"行业代码": "industry", "行业名称": "industry_name"})
+        if not required.issubset(frame.columns):
+            raise ValueError(f"native {name} source is missing required columns: {sorted(required)}")
+        frame = frame.rename(columns=names)
+        date_columns = ("date", "snapshot_date") if name == "benchmark_weights" else ("date",)
+        for column in date_columns:
+            values = frame[column].astype("string")
+            if values.isna().any() or not values.str.fullmatch(r"[0-9]{8}").all():
+                raise ValueError(f"native {name} {column} must use YYYYMMDD")
+            frame[column] = pd.to_datetime(values, format="%Y%m%d").dt.strftime("%Y-%m-%d")
+    return frame

@@ -9,7 +9,11 @@
 `friendly_output=False` 时，`engine.run()` 不主动打印进度或结果，命令行评测向标准输出打印指标 JSON。
 `engine.run()` 返回 15 项原始指标，
 并保留最终账户和七张审计表。指定输出目录时生成指标 JSON、七张 CSV 和运行日志。
-优化器支持 Top-K、简单基准倾斜和 Barra 风险优化；正式方法支持主动权重、行业、风格及换手约束。
+优化器只提供 Top-K 和 Barra 约束优化器两种选择；
+支持单股、主动权重、行业、风格及换手约束。RankIC / RankICIR 始终按当日合法股票池全截面计算。
+所有数据统一从 `data_dir` 读取，按实际目录和文件字段检查可用性。
+自动读取其下 `HS300_weight`、`HS300_industry` 年度中文文件；权重按日归一化，行业按历史行业代码分组。
+权重名单必须与当日成分一致，原始数据不变。
 
 ## 快速开始
 
@@ -31,8 +35,14 @@ naive 模型为当日全部沪深300成分股统一输出零分，`top_k=300` �
 每5个交易日生成调仓信号，下一交易日开盘执行；实际持仓受停牌等交易限制影响。
 运行前请将示例中的 `data_dir` 改为实际数据目录。
 
+使用现有 `D:\Data` 的 Barra 约束示例见 [examples/barra_usage.py](examples/barra_usage.py)。
+Barra 所需的 SciPy 随包默认安装；运行该示例即可使用已有风格暴露、权重和行业数据构建组合。
+`OptimizerConfig(method="barra")` 统一执行约束优化，没有内部模式选择。
+指数日收益放在 `data_dir/HS300_return`，启用 `benchmark_mode="csi300"` 时读取。
+默认 `benchmark_mode="none"` 不计算相对指数的绩效指标，仍可进行组合优化。
+
 `BacktestEngine` 也支持传入 `submission_dir`，由平台加载标准提交并管理每次评测的模型实例。
-完整配置、风险数据与可复现性约定见[使用说明](docs/usage.md)。
+完整配置、参考数据与可复现性约定见[使用说明](docs/usage.md)。
 
 ## 文档
 
@@ -40,7 +50,6 @@ naive 模型为当日全部沪深300成分股统一输出零分，`top_k=300` �
 - [实现设计与开发](docs/design.md)：数据流、模块边界、当前进度、测试与打包。
 - [组件接口协议](docs/interfaces.md)：缓存主题、共享数据包、固定入口和并行文件归属。
 - [性能基线](docs/benchmarks.md)：复测方法、吞吐与内存结果、指标口径。
-- [总设计独立审查](docs/spec_audit.md)：需求覆盖矩阵、返修闭合与独立验证。
 - [开发规格](BACKTEST_PLATFORM_SPEC_v2.md)：只读需求文档。
 
 ## 许可证

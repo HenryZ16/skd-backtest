@@ -6,7 +6,7 @@ import unittest
 
 import pandas as pd
 
-from skd_backtest.config import BacktestConfig, DataCapabilities
+from skd_backtest.config import BacktestConfig
 from skd_backtest.data_provider import DataProvider
 from skd_backtest.schemas import SOURCE_COLUMNS
 
@@ -65,7 +65,7 @@ class MarketDataComponentTest(unittest.TestCase):
                 folder.mkdir(parents=True, exist_ok=True)
                 part.to_parquet(folder / f"{month}.parquet", index=False)
 
-    def config(self, root, *, price_mode="raw_price", capabilities=None,
+    def config(self, root, *, price_mode="raw_price",
                start="2021-01-04", end="2021-01-05", prefetch=False,
                label_price_basis="adjusted_open"):
         return BacktestConfig(
@@ -83,7 +83,6 @@ class MarketDataComponentTest(unittest.TestCase):
             read_batch_months=1,
             prefetch=prefetch,
             label_price_basis=label_price_basis,
-            data_capabilities=capabilities or DataCapabilities(),
         )
 
     @staticmethod
@@ -103,8 +102,7 @@ class MarketDataComponentTest(unittest.TestCase):
             self.root, include_raw=True, include_factor=True,
             factor_values=[99.0] * len(DAYS),
         )
-        capabilities = DataCapabilities(raw_prices=True, adjustment_factors=True, price_limits=True)
-        provider = DataProvider(self.config(self.root, capabilities=capabilities))
+        provider = DataProvider(self.config(self.root))
         with provider:
             self.assertEqual(provider.prepare(), ["2021-01-04", "2021-01-05"])
             opened = provider.open_market("2021-01-04")
@@ -130,8 +128,7 @@ class MarketDataComponentTest(unittest.TestCase):
 
     def test_factor_mode_divides_adjusted_ohlc_and_valuation_uses_raw_basis(self):
         self.write_market(self.root, include_raw=False, include_factor=True)
-        capabilities = DataCapabilities(adjustment_factors=True, price_limits=True)
-        provider = DataProvider(self.config(self.root, capabilities=capabilities))
+        provider = DataProvider(self.config(self.root))
         with provider:
             provider.prepare()
             opened = provider.open_market("2021-01-04").iloc[0]
@@ -150,8 +147,7 @@ class MarketDataComponentTest(unittest.TestCase):
 
     def test_research_exposes_only_source_columns_and_as_of_mutation_isolated(self):
         self.write_market(self.root, include_raw=True, include_factor=True)
-        capabilities = DataCapabilities(raw_prices=True, price_limits=True)
-        provider = DataProvider(self.config(self.root, capabilities=capabilities))
+        provider = DataProvider(self.config(self.root))
         with provider:
             provider.prepare()
             data = provider.as_of("2021-01-04")
@@ -167,12 +163,11 @@ class MarketDataComponentTest(unittest.TestCase):
 
     def test_synchronous_and_prefetched_raw_playback_are_identical(self):
         self.write_market(self.root, include_raw=True)
-        capabilities = DataCapabilities(raw_prices=True, price_limits=True)
         synchronous = self.capture(self.config(
-            self.root, capabilities=capabilities, start="2020-12-30", prefetch=False,
+            self.root, start="2020-12-30", prefetch=False,
         ))
         prefetched = self.capture(self.config(
-            self.root, capabilities=capabilities, start="2020-12-30", prefetch=True,
+            self.root, start="2020-12-30", prefetch=True,
         ))
         self.assertEqual(len(synchronous), len(prefetched))
         for sync_day, async_day in zip(synchronous, prefetched):
@@ -185,16 +180,16 @@ class MarketDataComponentTest(unittest.TestCase):
     def test_missing_factor_limits_and_invalid_market_values_fail_clearly(self):
         cases = (
             ("factor column", dict(include_raw=False, include_factor=False),
-             DataCapabilities(adjustment_factors=True, price_limits=True), "adjustment_factor"),
+             "adjustment_factor"),
             ("upper limit column", dict(include_raw=True, include_limits=False),
-             DataCapabilities(raw_prices=True, price_limits=True), "upper_limit"),
+             "upper_limit"),
             ("invalid factor", dict(include_raw=False, include_factor=True,
                                     invalid_factor_date=20210104),
-             DataCapabilities(adjustment_factors=True, price_limits=True), "positive and finite"),
+             "positive and finite"),
             ("unordered limits", dict(include_raw=True),
-             DataCapabilities(raw_prices=True, price_limits=True), "finite, positive, and ordered"),
+             "finite, positive, and ordered"),
         )
-        for label, options, capabilities, expected in cases:
+        for label, options, expected in cases:
             with self.subTest(label=label), TemporaryDirectory() as temp:
                 root = Path(temp)
                 self.write_market(root, **options)
@@ -203,22 +198,34 @@ class MarketDataComponentTest(unittest.TestCase):
                     market = pd.read_parquet(path)
                     market.loc[market["日期"] == 20210104, "lower_limit"] = 100.0
                     market.to_parquet(path, index=False)
-                provider = DataProvider(self.config(root, capabilities=capabilities))
+                provider = DataProvider(self.config(root))
                 with provider, self.assertRaisesRegex(ValueError, expected):
                     provider.prepare()
                     provider.open_market("2021-01-04")
 
-    def test_missing_price_capability_still_rejects_raw_mode(self):
-        self.write_market(self.root, include_raw=True)
-        provider = DataProvider(self.config(self.root, capabilities=DataCapabilities()))
-        with provider, self.assertRaisesRegex(NotImplementedError, "raw_price"):
+    def test_missing_raw_price_fields_reject_raw_mode(self):
+        self.write_market(self.root, include_raw=False)
+        provider = DataProvider(self.config(self.root))
+        with provider, self.assertRaisesRegex(ValueError, "raw_price"):
             provider.prepare()
+            provider.open_market("2021-01-04")
+
+    def test_raw_source_is_detected_per_month_including_seed_history(self):
+        self.write_market(self.root, include_raw=True, include_factor=True)
+        path = self.root / "MarketData" / "2020" / "12" / "202012.parquet"
+        table = pd.read_parquet(path).drop(columns=["raw_open", "raw_high", "raw_low", "raw_close"])
+        table.to_parquet(path, index=False)
+        with DataProvider(self.config(self.root)) as provider:
+            provider.prepare()
+            row = provider.open_market("2021-01-04").iloc[0]
+            self.assertEqual(row.raw_open, RAW_OPEN[2])
+            self.assertEqual(row.previous_close, RAW_CLOSE[1])
+            self.assertEqual(row.previous_close_date, 20201231)
 
     def test_adjusted_execution_stays_adjusted_when_labels_request_raw_open(self):
         self.write_market(self.root, include_raw=True, include_factor=True)
         config = self.config(
             self.root, price_mode="adjusted_return",
-            capabilities=DataCapabilities(raw_prices=True, price_limits=True),
             label_price_basis="raw_open",
         )
         provider = DataProvider(config)

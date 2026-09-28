@@ -1,6 +1,7 @@
 from pathlib import Path
 import unittest
 
+import numpy as np
 import pandas as pd
 
 from skd_backtest.accounting import PortfolioAccounting
@@ -300,6 +301,123 @@ class TestPortfolioAccounting(unittest.TestCase):
                         date=date, market=pd.DataFrame([{"code": "A", **market_values}]),
                         cache=cache,
                     )
+
+
+    def test_masks_align_codes_and_choose_latest_past_price_with_account_tie_priority(self):
+        date = "2024-01-05"
+        codes = ["tie", "fresh", "suspended", "missing", "latest", "today", "future", "zero"]
+        expected = {"tie": 10.0, "fresh": 12.0, "suspended": 11.0, "missing": 10.0,
+                    "latest": 14.0, "today": 10.0, "future": 11.0}
+        for mode in ("adjusted_return", "raw_price"):
+            with self.subTest(mode=mode):
+                holdings = []
+                for code in codes:
+                    amount = 0 if code == "zero" else (10 if mode == "raw_price" else 100.0)
+                    holding = {"code": code, "reference_price": None if code == "zero" else 10.0,
+                               "reference_date": {"tie": "2024-01-04", "today": date,
+                                                  "future": "2024-01-06"}.get(code, "2024-01-01")}
+                    holding.update({"total_shares": amount, "sellable_shares": amount}
+                                   if mode == "raw_price" else {"position_value": amount})
+                    holdings.append(holding)
+                account = _account(mode, 0, holdings)
+                account.positions.index = range(10, 10 + len(codes))
+                price = "raw_open" if mode == "raw_price" else "adjusted_open"
+                market = pd.DataFrame([
+                    {"code": "future", price: None, "previous_close": 11., "previous_close_date": 20240104},
+                    {"code": "today", price: None, "reference_close": 999., "reference_date": 20240105},
+                    {"code": "tie", price: None, "reference_close": 99., "reference_date": 20240104},
+                    {"code": "latest", price: None, "reference_close": 14., "reference_date": 20240104,
+                     "previous_close": 13., "previous_close_date": 20240103},
+                    {"code": "suspended", price: 999., "is_suspended": True, "reference_close": 13.,
+                     "reference_date": 20240103, "previous_close": 11., "previous_close_date": 20240104},
+                    {"code": "fresh", price: 12., "is_suspended": False},
+                ])
+                before_account, before_market = account.positions.copy(deep=True), market.copy(deep=True)
+                cache = MemoryCache({(Topic.ACCOUNT_SETTLED, date): account})
+                PortfolioAccounting(_config(mode)).mark_at_open(date=date, market=market, cache=cache)
+                result = cache.read(Topic.ACCOUNT_OPEN, date)
+                self.assertEqual(dict(zip(result.values.code, result.values.price)), expected)
+                self.assertEqual(result.market_value, 780.0)
+                self.assertEqual(len(result.account.positions), len(codes))
+                self.assertEqual(result.values.set_index("code").loc["suspended", "price_date"], "2024-01-04")
+                pd.testing.assert_frame_equal(account.positions, before_account)
+                pd.testing.assert_frame_equal(market, before_market)
+
+    def test_raw_masks_use_explicit_raw_history_and_never_adjusted_history(self):
+        date = "2024-01-05"
+        account = _account("raw_price", 0, [{"code": "A", "total_shares": 10, "sellable_shares": 10,
+                                            "reference_price": 10., "reference_date": "2024-01-01"}])
+        market = pd.DataFrame([{"code": "A", "adjusted_open": 999., "reference_close": 888.,
+                                "reference_date": 20240104, "is_suspended": True}])
+        for use_raw, expected in ((False, 10.), (True, 11.)):
+            with self.subTest(use_raw=use_raw):
+                data = market.assign(raw_reference_close=11., raw_reference_date=20240104) if use_raw else market
+                cache = MemoryCache({(Topic.ACCOUNT_SETTLED, date): account})
+                PortfolioAccounting(_config("raw_price")).mark_at_open(date=date, market=data, cache=cache)
+                self.assertEqual(cache.read(Topic.ACCOUNT_OPEN, date).market_value, 10 * expected)
+
+        # A valid current raw price replaces an unusable historical reference.
+        account.positions["reference_price"] = False
+        cache = MemoryCache({(Topic.ACCOUNT_SETTLED, date): account})
+        PortfolioAccounting(_config("raw_price")).mark_at_open(
+            date=date, market=pd.DataFrame({"code": ["A"], "raw_open": [12.]}), cache=cache)
+        self.assertEqual(cache.read(Topic.ACCOUNT_OPEN, date).account.positions.reference_price.iloc[0], 12.)
+
+    def test_masks_reject_invalid_amounts_and_overflow(self):
+        date = "2024-01-02"
+        for mode in ("raw_price", "adjusted_return"):
+            for amount in (-1., float("inf"), float("nan"), True, None, "bad"):
+                with self.subTest(mode=mode, amount=amount):
+                    row = {"code": "A", "reference_price": 10., "reference_date": "2024-01-01"}
+                    row.update({"total_shares": amount, "sellable_shares": 0}
+                               if mode == "raw_price" else {"position_value": amount})
+                    account = _account(mode, 0, [row])
+                    cache = MemoryCache({(Topic.ACCOUNT_SETTLED, date): account})
+                    price = "raw_open" if mode == "raw_price" else "adjusted_open"
+                    with self.assertRaisesRegex(ValueError, "invalid .* for 'A'"):
+                        PortfolioAccounting(_config(mode)).mark_at_open(
+                            date=date, market=pd.DataFrame([{"code": "A", price: 10.}]), cache=cache)
+        account = _account("adjusted_return", 0, [{"code": "A", "position_value": 1e308,
+                                                   "reference_price": 1., "reference_date": date}])
+        cache = MemoryCache({(Topic.ACCOUNT_SETTLED, date): account})
+        with self.assertRaisesRegex(ValueError, "non-finite market value"):
+            PortfolioAccounting(_config()).mark_at_open(
+                date=date, market=pd.DataFrame([{"code": "A", "adjusted_open": 10.}]), cache=cache)
+
+    def test_masks_reject_future_only_fallback(self):
+        date = "2024-01-05"
+        account = _account("raw_price", 0, [{"code": "A", "total_shares": 10, "sellable_shares": 10,
+                                            "reference_price": 10., "reference_date": "2024-01-06"}])
+        market = pd.DataFrame([{"code": "A", "raw_open": None, "reference_close": 12.,
+                                "reference_date": 20240105, "previous_close": 13.,
+                                "previous_close_date": 20240106}])
+        cache = MemoryCache({(Topic.ACCOUNT_SETTLED, date): account})
+        with self.assertRaisesRegex(ValueError, "no valid current or historical reference price"):
+            PortfolioAccounting(_config("raw_price")).mark_at_open(date=date, market=market, cache=cache)
+
+    def test_batch_total_preserves_left_to_right_floating_point_order(self):
+        date = "2024-01-02"
+        amounts = [1e16, *([1.] * 15)]
+        rows = [{"code": str(i), "position_value": amount, "reference_price": 1.,
+                 "reference_date": "2024-01-01"} for i, amount in enumerate(amounts)]
+        account = _account("adjusted_return", 0, rows)
+        market = pd.DataFrame({"code": [row["code"] for row in rows], "adjusted_open": 1.})
+        cache = MemoryCache({(Topic.ACCOUNT_SETTLED, date): account})
+        PortfolioAccounting(_config()).mark_at_open(date=date, market=market, cache=cache)
+        self.assertEqual(cache.read(Topic.ACCOUNT_OPEN, date).market_value, 1e16)
+        self.assertNotEqual(float(np.sum(amounts)), 1e16)
+
+    def test_masks_accept_nullable_numeric_columns_and_flags(self):
+        date = "2024-01-02"
+        account = _account("adjusted_return", 0, [{"code": "A", "position_value": 100.,
+                                                   "reference_price": 10., "reference_date": "2024-01-01"}])
+        account.positions["position_value"] = account.positions.position_value.astype("Float64")
+        market = pd.DataFrame({"code": ["A"], "adjusted_open": pd.array([12.], dtype="Float64"),
+                               "is_suspended": pd.array([pd.NA], dtype="boolean"),
+                               "is_missing": pd.array([False], dtype="boolean")})
+        cache = MemoryCache({(Topic.ACCOUNT_SETTLED, date): account})
+        PortfolioAccounting(_config()).mark_at_open(date=date, market=market, cache=cache)
+        self.assertEqual(cache.read(Topic.ACCOUNT_OPEN, date).market_value, 120.)
 
 if __name__ == "__main__":
     unittest.main()

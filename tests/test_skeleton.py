@@ -36,7 +36,7 @@ class SkeletonTest(unittest.TestCase):
         self.dates = ["2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05", "2018-01-08"]
         self.calls = []
 
-    def inference(self, *, as_of_date, data):
+    def inference(self, *, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
         self.calls.append(as_of_date)
         for frame in data.values():
             self.assertLessEqual(frame["日期"].max(), int(as_of_date.replace("-", "")))
@@ -139,7 +139,7 @@ class SkeletonTest(unittest.TestCase):
         original_execute = engine.broker.execute
         original_as_of = engine.data_provider.as_of
 
-        def inference(*, as_of_date, data):
+        def inference(*, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
             self.assertNotEqual(get_ident(), owner)
             model_threads.append(current_thread().name)
             if as_of_date == first:
@@ -193,7 +193,7 @@ class SkeletonTest(unittest.TestCase):
     def test_failed_inference_stops_queued_model_calls_and_can_restart(self):
         calls = []
 
-        def fail(*, as_of_date, data):
+        def fail(*, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
             calls.append(as_of_date)
             raise RuntimeError("first prediction failed")
 
@@ -210,7 +210,7 @@ class SkeletonTest(unittest.TestCase):
     def test_future_inference_error_is_reported_at_its_signal_date(self):
         first, execution, second = self.dates[:3]
 
-        def inference(*, as_of_date, data):
+        def inference(*, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
             if as_of_date == second:
                 raise RuntimeError("future prediction failed")
             return self.inference(as_of_date=as_of_date, data=data)
@@ -299,14 +299,16 @@ class SkeletonTest(unittest.TestCase):
         )
         for frame in bad:
             with self.subTest(frame=frame):
-                engine = self.make_engine(inference=lambda **kw: frame)
+                def inference(as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
+                    return frame
+                engine = self.make_engine(inference=inference)
                 with protocol_components(engine) as trace, self.assertRaises(ValueError):
                     engine.run()
                 self.assertFalse(any(item[0] == "optimize" for item in trace))
                 self.assertIsNone(engine.metrics)
                 self.assertIsNone(engine.data_provider._executor)
 
-        def inference(**kwargs):
+        def inference(*, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
             raise RuntimeError("model failed")
         engine = self.make_engine(inference=inference)
         with protocol_components(engine), self.assertRaisesRegex(RuntimeError, "model failed"):

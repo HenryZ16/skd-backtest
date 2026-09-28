@@ -2,12 +2,13 @@
 
 from math import isfinite
 
+import numpy as np
 import pandas as pd
 
 from .config import BacktestConfig
 from .contracts import BenchmarkDay, CloseSnapshot, OpenSnapshot, Topic
 from .runtime_cache import CacheView
-from .schemas import RESULT_COLUMNS, STATE_COLUMNS, VALUE_COLUMNS, WEIGHT_COLUMNS
+from .schemas import RESULT_COLUMNS, VALUE_COLUMNS, WEIGHT_COLUMNS
 
 
 def _number(value):
@@ -22,158 +23,141 @@ def _number(value):
     return value if isfinite(value) else None
 
 
-def _date_key(value):
-    if value is None:
-        return None
-    try:
-        if pd.isna(value):
-            return None
-    except (TypeError, ValueError):
-        return None
-    digits = "".join(char for char in str(value) if char.isdigit())
-    return int(digits[:8]) if len(digits) >= 8 else None
+def _numeric_column(frame, name):
+    if name not in frame:
+        return np.full(len(frame), np.nan)
+    column = frame[name]
+    if column.dtype.kind not in "iuf":
+        column = column.map(_number)
+    return column.to_numpy(dtype=float, na_value=np.nan)
 
 
-def _date_text(value):
-    key = _date_key(value)
-    if key is None:
-        return str(value)
-    return f"{key // 10000:04d}-{key // 100 % 100:02d}-{key % 100:02d}"
+def _date_column(frame, name):
+    if name not in frame:
+        return np.full(len(frame), np.nan)
+    column = frame[name]
+    if column.dtype.kind in "iuf":
+        days = column.to_numpy(dtype=float, na_value=np.nan)
+        return np.where((days >= 10_000_000) & (days < 100_000_000), np.trunc(days), np.nan)
+    digits = column.astype("string").str.replace(r"\D", "", regex=True).str[:8]
+    return pd.to_numeric(digits.where(digits.str.len() == 8), errors="coerce").to_numpy(
+        dtype=float, na_value=np.nan)
 
 
-def _flag(value):
-    try:
-        return False if pd.isna(value) else bool(value)
-    except (TypeError, ValueError):
-        return False
+def _valuation_prices(positions, market, *, date, price_mode, price_column):
+    prices = _numeric_column(market, price_column).copy()
+    valid = np.isfinite(prices) & (prices > 0)
+    for name in ("is_suspended", "is_missing"):
+        if name in market:
+            flags = market[name].to_numpy(dtype=bool, na_value=False)
+            valid &= ~flags
+    price_dates = np.full(len(positions), date, dtype=object)
+    if valid.all():
+        return prices, price_dates
 
+    # Select fallback sources for every unavailable price with the same masks.
+    missing = ~valid
+    held = positions.iloc[np.flatnonzero(missing)]
+    history = market.iloc[np.flatnonzero(missing)]
+    today = int(date.replace("-", ""))
+    chosen_prices = _numeric_column(held, "reference_price").copy()
+    chosen_dates = _date_column(held, "reference_date")
+    available = (np.isfinite(chosen_prices) & (chosen_prices > 0)
+                 & np.isfinite(chosen_dates) & (chosen_dates <= today))
+    chosen_prices[~available] = np.nan
+    chosen_dates = np.where(available, chosen_dates, -np.inf)
 
-def _market_rows(market, held_codes):
-    if market.empty:
-        return {}
-    # Only held securities need Python records for valuation.
-    held_market = market.loc[market["code"].isin(held_codes)]
-    return held_market.set_index("code").to_dict("index")
-
-
-def _historical_prices(row, price_mode, today):
-    if row is None:
-        return []
+    pairs = (("reference_close", "reference_date"), ("previous_close", "previous_close_date"))
     if price_mode == "raw_price":
-        raw_fields = ("raw_reference_close", "raw_previous_close")
-        if any(name in row for name in raw_fields):
-            pairs = ((raw_fields[0], "raw_reference_date"),
-                     (raw_fields[1], "raw_previous_close_date"))
-        elif not any(name in row for name in ("adjusted_open", "adjusted_close")):
-            pairs = (("reference_close", "reference_date"),
-                     ("previous_close", "previous_close_date"))
-        else:
+        if any(name in market for name in ("raw_reference_close", "raw_previous_close")):
+            pairs = (("raw_reference_close", "raw_reference_date"),
+                     ("raw_previous_close", "raw_previous_close_date"))
+        elif any(name in market for name in ("adjusted_open", "adjusted_close")):
             pairs = ()
-    else:
-        pairs = (("reference_close", "reference_date"),
-                 ("previous_close", "previous_close_date"))
-
-    result = []
-    for price_column, date_column in pairs:
-        price = _number(row.get(price_column))
-        price_date = row.get(date_column)
-        price_day = _date_key(price_date)
-        if price is not None and price > 0 and price_day is not None and price_day < today:
-            result.append((price_day, 0, price, _date_text(price_date)))
-    return result
-
-
-def _valuation_price(position, market_row, *, code, date, price_mode, price_column):
-    today = _date_key(date)
-    if market_row is not None and not _flag(market_row.get("is_suspended")) \
-            and not _flag(market_row.get("is_missing")):
-        price = _number(market_row.get(price_column))
-        if price is not None and price > 0:
-            return price, date
-
-    account_price = _number(position.get("reference_price"))
-    account_date = position.get("reference_date")
-    account_day = _date_key(account_date)
-    if account_price is not None and account_price > 0 and account_day is not None \
-            and account_day <= today:
-        if account_day == today:
-            return account_price, _date_text(account_date)
-        candidates = [(account_day, 1, account_price, _date_text(account_date))]
-    else:
-        candidates = []
-
-    candidates.extend(_historical_prices(market_row, price_mode, today))
-    if not candidates:
-        raise ValueError(
-            f"cannot value {price_mode} holding {code!r} on {date}: "
-            "no valid current or historical reference price"
-        )
-    _, _, price, price_date = max(candidates, key=lambda item: (item[0], item[1]))
-    return price, price_date
+    for price_name, date_name in pairs:
+        candidate_prices = _numeric_column(history, price_name)
+        candidate_dates = _date_column(history, date_name)
+        newer = (np.isfinite(candidate_prices) & (candidate_prices > 0)
+                 & np.isfinite(candidate_dates) & (candidate_dates < today)
+                 & (candidate_dates > chosen_dates))
+        # Strictly newer preserves account > reference close > previous close on ties.
+        chosen_prices = np.where(newer, candidate_prices, chosen_prices)
+        chosen_dates = np.where(newer, candidate_dates, chosen_dates)
+    invalid = ~np.isfinite(chosen_prices)
+    if invalid.any():
+        code = held.code.iloc[np.flatnonzero(invalid)[0]]
+        raise ValueError(f"cannot value {price_mode} holding {code!r} on {date}: "
+                         "no valid current or historical reference price")
+    prices[missing] = chosen_prices
+    price_dates[missing] = pd.to_datetime(chosen_dates.astype(np.int64), format="%Y%m%d").strftime("%Y-%m-%d")
+    return prices, price_dates
 
 
 def _mark_account(account, market, *, date, stage):
     mode = account.price_mode
-    if account.positions.empty:
-        return account.positions, pd.DataFrame(columns=VALUE_COLUMNS), 0.0
+    source = account.positions
+    if source.empty:
+        return source, pd.DataFrame(columns=VALUE_COLUMNS), 0.0
+    codes = source.code.to_numpy()
+    amount_column = "total_shares" if mode == "raw_price" else "position_value"
+    amounts = _numeric_column(source, amount_column)
+    invalid = ~np.isfinite(amounts) | (amounts < 0)
+    if invalid.any():
+        name = "raw share count" if mode == "raw_price" else "adjusted position value"
+        raise ValueError(f"invalid {name} for {codes[np.flatnonzero(invalid)[0]]!r}")
+    active = amounts > 0
+    if not active.any():
+        return source, pd.DataFrame(columns=VALUE_COLUMNS), 0.0
+    references = _numeric_column(source, "reference_price")
+    if mode == "adjusted_return":
+        invalid = active & (~np.isfinite(references) | (references <= 0))
+        if invalid.any():
+            raise ValueError(f"adjusted holding {codes[np.flatnonzero(invalid)[0]]!r} has no valid reference price")
+
+    held = source.iloc[np.flatnonzero(active)]
+    aligned = (market.set_index("code").reindex(codes[active]) if not market.empty
+               else pd.DataFrame(index=range(len(held))))
     price_column = ("raw_open" if stage == "open" else "raw_close") \
         if mode == "raw_price" else ("adjusted_open" if stage == "open" else "adjusted_close")
-    market_by_code = _market_rows(market, account.positions.code)
-    marked_rows = []
-    values = []
-    market_value = 0.0
-    changed = False
+    prices, price_dates = _valuation_prices(
+        held, aligned, date=date, price_mode=mode, price_column=price_column,
+    )
 
-    for original in account.positions.to_dict("records"):
-        row = original
-        code = row["code"]
-        if mode == "raw_price":
-            shares = _number(row.get("total_shares"))
-            if shares is None or shares < 0:
-                raise ValueError(f"invalid raw share count for {code!r}")
-            if shares == 0:
-                marked_rows.append(row)
-                continue
-        else:
-            position_value = _number(row.get("position_value"))
-            reference_price = _number(row.get("reference_price"))
-            if position_value is None or position_value < 0:
-                raise ValueError(f"invalid adjusted position value for {code!r}")
-            if position_value == 0:
-                marked_rows.append(row)
-                continue
-            if reference_price is None or reference_price <= 0:
-                raise ValueError(f"adjusted holding {code!r} has no valid reference price")
-
-        price, price_date = _valuation_price(
-            row, market_by_code.get(code), code=code, date=date,
-            price_mode=mode, price_column=price_column,
-        )
-        if mode == "raw_price":
-            value = shares * price
-            update = price != _number(row.get("reference_price")) \
-                or price_date != _date_text(row.get("reference_date"))
-        else:
-            value = position_value * price / reference_price
-            update = value != position_value or price != reference_price \
-                or price_date != _date_text(row.get("reference_date"))
-        if not isfinite(value):
-            raise ValueError(f"non-finite market value for {code!r} on {date}")
-
-        if update:
-            row = dict(row, reference_price=price, reference_date=price_date)
-            if mode == "adjusted_return":
-                row["position_value"] = value
-            changed = True
-        marked_rows.append(row)
-        values.append(dict(code=code, price=price, price_date=price_date, market_value=value))
-        market_value += value
-
+    with np.errstate(over="ignore", invalid="ignore"):
+        values = amounts[active] * prices
+        if mode == "adjusted_return":
+            values = values / references[active]
+    invalid = ~np.isfinite(values)
+    if invalid.any():
+        raise ValueError(f"non-finite market value for {codes[active][np.flatnonzero(invalid)[0]]!r} on {date}")
+    # Preserve the previous left-to-right sum so cash-sensitive orders stay identical.
+    with np.errstate(over="ignore"):
+        market_value = float(np.add.accumulate(values)[-1])
     if not isfinite(market_value):
         raise ValueError(f"non-finite portfolio market value on {date}")
-    positions = (pd.DataFrame(marked_rows, columns=STATE_COLUMNS[mode])
-                 if changed else account.positions)
-    return positions, pd.DataFrame(values, columns=VALUE_COLUMNS), market_value
+
+    dates = source.reference_date.to_numpy(dtype=object, na_value=None)
+    changed = (np.any(prices != references[active]) or np.any(price_dates != dates[active])
+               or (mode == "adjusted_return" and np.any(values != amounts[active])))
+    positions = source
+    if changed:
+        positions = source.copy()
+        positions.index = pd.RangeIndex(len(positions))
+        updated_prices = source.reference_price.to_numpy(copy=True)
+        if updated_prices.dtype.kind != "f":
+            updated_prices = updated_prices.astype(float if updated_prices.dtype.kind in "iu" else object)
+        updated_prices[active] = prices
+        updated_dates = dates.copy()
+        updated_dates[active] = price_dates
+        positions["reference_price"] = updated_prices
+        positions["reference_date"] = updated_dates
+        if mode == "adjusted_return":
+            updated_values = amounts.copy()
+            updated_values[active] = values
+            positions["position_value"] = updated_values
+    return positions, pd.DataFrame({
+        "code": codes[active], "price": prices, "price_date": price_dates, "market_value": values,
+    }, columns=VALUE_COLUMNS), market_value
 
 
 class PortfolioAccounting:
@@ -192,42 +176,37 @@ class PortfolioAccounting:
     def mark_to_market(self, *, date: str, market: pd.DataFrame, cache: CacheView) -> None:
         execution = cache.read(Topic.EXECUTION_DAY, date)
         opening = cache.read(Topic.ACCOUNT_OPEN, date)
-        positions, _, market_value = _mark_account(
+        positions, values, market_value = _mark_account(
             execution.account, market, date=date, stage="close",
         )
         account = execution.account
         if positions is not account.positions:
             account = type(account)(account.price_mode, account.cash, positions, account.locked_lots)
 
-        position_rows = []
-        for value in account.positions.to_dict("records"):
-            if account.price_mode == "raw_price":
-                shares = _number(value.get("total_shares")) or 0.0
-                sellable = _number(value.get("sellable_shares")) or 0.0
-                if shares == 0:
-                    continue
-                close = _number(value.get("reference_price"))
-                position_value = shares * close
-            else:
-                position_value = _number(value.get("position_value")) or 0.0
-                if position_value == 0:
-                    continue
-                shares = sellable = None
-                close = _number(value.get("reference_price"))
-            position_rows.append(dict(
-                date=date, code=value["code"], shares=shares, sellable_shares=sellable,
-                close=close, market_value=position_value,
-                weight=position_value / (execution.account.cash + market_value),
-            ))
-        positions_table = pd.DataFrame(position_rows, columns=RESULT_COLUMNS["positions"])
-        if not positions_table.empty:
-            positions_table = positions_table.sort_values("code", kind="stable", ignore_index=True)
-        weights = (positions_table.loc[:, ["code", "weight"]]
-                   if not positions_table.empty else pd.DataFrame(columns=WEIGHT_COLUMNS))
-
         portfolio_value = execution.account.cash + market_value
         if not isfinite(portfolio_value) or portfolio_value < 0:
             raise ValueError(f"invalid portfolio value on {date}")
+        if values.empty:
+            positions_table = pd.DataFrame(columns=RESULT_COLUMNS["positions"])
+        else:
+            raw = account.price_mode == "raw_price"
+            live = np.ones(len(values), dtype=bool) if raw else values.market_value.to_numpy() > 0
+            shares = sellable = None
+            if raw:
+                held_shares = _numeric_column(positions, "total_shares")
+                shares = held_shares[held_shares > 0]
+                sellable = _numeric_column(positions, "sellable_shares")[held_shares > 0]
+                sellable = np.where(np.isfinite(sellable), sellable, 0.0)
+            positions_table = pd.DataFrame({
+                "date": date, "code": values.code.to_numpy()[live],
+                "shares": shares, "sellable_shares": sellable,
+                "close": values.price.to_numpy()[live],
+                "market_value": values.market_value.to_numpy()[live],
+                "weight": values.market_value.to_numpy()[live] / portfolio_value,
+            }, columns=RESULT_COLUMNS["positions"]).sort_values("code", kind="stable", ignore_index=True)
+        weights = (positions_table.loc[:, ["code", "weight"]]
+                   if not positions_table.empty else pd.DataFrame(columns=WEIGHT_COLUMNS))
+
         dates = cache.read(Topic.RUN_CALENDAR).trading_dates
         day_index = dates.index(date)
         if day_index:

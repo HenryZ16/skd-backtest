@@ -9,7 +9,7 @@ import pandas as pd
 
 from .accounting import PortfolioAccounting
 from .broker import Broker
-from .config import BacktestConfig, CostConfig, DataCapabilities, OptimizerConfig, ReferenceSources
+from .config import BacktestConfig, CostConfig, OptimizerConfig
 from .console import ConsoleReporter
 from .contracts import ComponentRole as Role, MarketContext, Phase, RunCalendar, RunContext, Topic
 from .cost_model import CostModel
@@ -43,8 +43,6 @@ class BacktestEngine:
         random_seed: int = 0,
         benchmark_mode: Literal["none", "csi300"] = "none",
         label_price_basis: Literal["adjusted_open", "raw_open"] = "adjusted_open",
-        data_capabilities: DataCapabilities | None = None,
-        reference_sources: ReferenceSources | None = None,
     ):
         self.config = BacktestConfig(
             data_dir=Path(data_dir), start_date=start_date, end_date=end_date,
@@ -56,8 +54,6 @@ class BacktestEngine:
             read_batch_months=read_batch_months, prefetch=prefetch, async_inference=async_inference,
             random_seed=random_seed,
             benchmark_mode=benchmark_mode, label_price_basis=label_price_basis,
-            data_capabilities=data_capabilities or DataCapabilities(),
-            reference_sources=reference_sources or ReferenceSources(),
         )
         self.optimizer_config = optimizer_config or OptimizerConfig()
         self.cost_config = cost_config or CostConfig()
@@ -115,7 +111,7 @@ class BacktestEngine:
         try:
             console.status("准备回测数据…")
             call(Role.WRITER, self.result_writer.open)
-            self.config.validate_capabilities(self.optimizer_config)
+            self.config.validate_data(self.optimizer_config)
             active_component = "data_provider.prepare"
             dates = self.data_provider.prepare()
             calendar = RunCalendar.from_dates(dates, self.config.rebalance_interval)

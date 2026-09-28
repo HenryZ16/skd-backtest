@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from skd_backtest.config import BacktestConfig, DataCapabilities, ReferenceSources
+from skd_backtest.config import BacktestConfig, REFERENCE_DATASETS
 from skd_backtest.contracts import BenchmarkDay, MarketContext, Topic
 from skd_backtest.reference_data import ReferenceDataProvider
 
@@ -22,21 +22,20 @@ class MemoryCache:
         self.values[topic, key] = value
 
 
-def make_config(*, mode="csi300", returns=None, weights=None, industries=None, capabilities=None):
+def make_config(*, data_dir=".", mode="csi300"):
     return BacktestConfig(
-        data_dir=".", start_date="2024-01-02", end_date="2024-01-04",
+        data_dir=data_dir, start_date="2024-01-02", end_date="2024-01-04",
         initial_cash=1000.0, rebalance_interval=1, holding_period=1, lookback=1,
         price_mode="adjusted_return", trading_days_per_year=252, risk_free_rate=0.0,
         output_dir=None, benchmark_mode=mode,
-        data_capabilities=capabilities or DataCapabilities(
-            benchmark_returns=returns is not None,
-            benchmark_weights=weights is not None,
-            industries=industries is not None,
-        ),
-        reference_sources=ReferenceSources(
-            benchmark_returns=returns, benchmark_weights=weights, industries=industries,
-        ),
     )
+
+
+def source_path(root, kind, suffix="csv"):
+    name = {"returns": "benchmark_returns", "weights": "benchmark_weights", "industries": "industries"}[kind]
+    path = root / REFERENCE_DATASETS[name] / f"data.{suffix}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def market_context(date="2024-01-03"):
@@ -49,9 +48,9 @@ class ReferenceDataProviderTests(unittest.TestCase):
     def test_csv_and_parquet_sources_publish_exact_date_slices_and_share_market_refs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            returns_path = root / "returns.csv"
-            weights_path = root / "weights.parquet"
-            industries_path = root / "industries.csv"
+            returns_path = source_path(root, "returns")
+            weights_path = source_path(root, "weights", "parquet")
+            industries_path = source_path(root, "industries")
             pd.DataFrame([
                 ("2024-01-02", 0.01), ("2024-01-03", 0.02),
             ], columns=["date", "benchmark_return"]).to_csv(returns_path, index=False)
@@ -69,7 +68,7 @@ class ReferenceDataProviderTests(unittest.TestCase):
             original_barra = market.barra_exposures.copy(deep=True)
             cache = MemoryCache(market)
             provider = ReferenceDataProvider(make_config(
-                returns=returns_path, weights=weights_path, industries=industries_path,
+                data_dir=root,
             ))
 
             provider.prepare_close(date="2024-01-03", cache=cache)
@@ -99,52 +98,61 @@ class ReferenceDataProviderTests(unittest.TestCase):
             provider.prepare_close(date="2024-01-03", cache=cache)
             self.assertEqual(cache.values[Topic.REFERENCE_BENCHMARK, "2024-01-03"].data.benchmark_return, 0.09)
 
-    def test_unconfigured_sources_are_unavailable_and_benchmark_none_does_not_read_them(self):
-        market = market_context()
-        cache = MemoryCache(market)
-        csi_provider = ReferenceDataProvider(make_config(mode="csi300"))
-        csi_provider.prepare_close(date=market.date, cache=cache)
-        self.assertEqual(cache.values[Topic.REFERENCE_BENCHMARK, market.date].status, "unavailable")
+    def test_weights_are_normalized_per_date_without_rewriting_the_source(self):
+        rows = [
+            ("2024-01-02", "000001.SZ", .59988), ("2024-01-02", "600000.SH", .4),
+            ("2024-01-03", "000001.SZ", .60011), ("2024-01-03", "600000.SH", .4),
+            ("2024-01-04", "000001.SZ", 0.), ("2024-01-04", "600000.SH", .8),
+        ]
+        source = pd.DataFrame(rows, columns=["date", "code", "benchmark_weight"])
+        for suffix in ("csv", "parquet"):
+            with self.subTest(suffix=suffix), tempfile.TemporaryDirectory() as directory:
+                path = source_path(Path(directory), "weights", suffix)
+                getattr(source, "to_" + suffix)(path, index=False)
+                original = path.read_bytes()
+                provider = ReferenceDataProvider(make_config(data_dir=directory))
+                for date, expected in (("2024-01-02", .59988 / .99988),
+                                       ("2024-01-03", .60011 / 1.00011),
+                                       ("2024-01-04", 0.)):
+                    cache = MemoryCache(market_context(date))
+                    provider.prepare_signal(date=date, cache=cache)
+                    weights = cache.values[Topic.REFERENCE_PORTFOLIO, date].benchmark_weights.data
+                    self.assertAlmostEqual(weights.benchmark_weight.sum(), 1.)
+                    self.assertAlmostEqual(weights.benchmark_weight.iloc[0], expected)
+                self.assertEqual(path.read_bytes(), original)
 
-        provider = ReferenceDataProvider(make_config(mode="none"))
-        provider.prepare_close(date=market.date, cache=cache)
-        provider.prepare_signal(date=market.date, cache=cache)
-        self.assertEqual(cache.values[Topic.REFERENCE_BENCHMARK, market.date].reason, "benchmark_mode=none")
-        inputs = cache.values[Topic.REFERENCE_PORTFOLIO, market.date]
-        self.assertEqual(inputs.benchmark_weights.status, "unavailable")
-        self.assertEqual(inputs.industries.status, "unavailable")
-
-        missing = Path(tempfile.gettempdir()) / "must-not-be-read-reference.parquet"
-        provider = ReferenceDataProvider(make_config(
-            mode="none", returns=missing, weights=missing,
-            capabilities=DataCapabilities(),
-        ))
-        provider.prepare_close(date=market.date, cache=cache)
-        provider.prepare_signal(date=market.date, cache=cache)
-        self.assertEqual(cache.values[Topic.REFERENCE_BENCHMARK, market.date].reason, "benchmark_mode=none")
-        self.assertEqual(cache.values[Topic.REFERENCE_PORTFOLIO, market.date].benchmark_weights.status, "unavailable")
-
-    def test_declared_missing_file_or_date_fails_instead_of_filling(self):
+    def test_missing_directories_and_disabled_benchmark(self):
         with tempfile.TemporaryDirectory() as directory:
-            missing = Path(directory) / "missing.csv"
-            cache = MemoryCache()
-            with self.assertRaises(FileNotFoundError):
-                ReferenceDataProvider(make_config(returns=missing)).prepare_close(
-                    date="2024-01-03", cache=cache,
-                )
+            market = market_context()
+            cache = MemoryCache(market)
+            with self.assertRaisesRegex(ValueError, "HS300_return"):
+                ReferenceDataProvider(make_config(data_dir=directory)).prepare_close(date=market.date, cache=cache)
+            # Even an invalid return file is ignored when index evaluation is disabled.
+            path = source_path(Path(directory), "returns")
+            path.write_text("invalid", encoding="utf-8")
+            provider = ReferenceDataProvider(make_config(data_dir=directory, mode="none"))
+            provider.prepare_close(date=market.date, cache=cache)
+            provider.prepare_signal(date=market.date, cache=cache)
+            self.assertEqual(cache.values[Topic.REFERENCE_BENCHMARK, market.date].reason, "benchmark_mode=none")
+            inputs = cache.values[Topic.REFERENCE_PORTFOLIO, market.date]
+            self.assertEqual(inputs.benchmark_weights.status, "unavailable")
+            self.assertEqual(inputs.industries.status, "unavailable")
 
-            path = Path(directory) / "returns.csv"
+    def test_missing_file_or_date_fails_instead_of_filling(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = source_path(Path(directory), "returns")
+            cache = MemoryCache()
+            with self.assertRaisesRegex(ValueError, "no CSV or Parquet"):
+                ReferenceDataProvider(make_config(data_dir=directory)).prepare_close(date="2024-01-03", cache=cache)
             pd.DataFrame([("2024-01-02", 0.01)], columns=["date", "benchmark_return"]).to_csv(path, index=False)
             with self.assertRaisesRegex(ValueError, "no data for 2024-01-03"):
-                ReferenceDataProvider(make_config(returns=path)).prepare_close(
-                    date="2024-01-03", cache=cache,
-                )
+                ReferenceDataProvider(make_config(data_dir=directory)).prepare_close(date="2024-01-03", cache=cache)
 
-    def test_weights_and_industries_must_cover_the_signal_universe(self):
+    def test_weights_and_industries_require_complete_coverage(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            weights = root / "weights.csv"
-            industries = root / "industries.csv"
+            weights = source_path(root / "weights_case", "weights")
+            industries = source_path(root / "industries_case", "industries")
             pd.DataFrame([
                 ("2024-01-03", "000001.SZ", 1.0),
             ], columns=["date", "code", "benchmark_weight"]).to_csv(weights, index=False)
@@ -153,24 +161,24 @@ class ReferenceDataProviderTests(unittest.TestCase):
             ], columns=["date", "code", "industry"]).to_csv(industries, index=False)
             cache = MemoryCache(market_context())
 
-            with self.assertRaisesRegex(ValueError, "cover the legal universe"):
-                ReferenceDataProvider(make_config(weights=weights)).prepare_signal(
+            with self.assertRaisesRegex(ValueError, "cover the legal universe exactly"):
+                ReferenceDataProvider(make_config(data_dir=root / "weights_case")).prepare_signal(
                     date="2024-01-03", cache=cache,
                 )
             with self.assertRaisesRegex(ValueError, "industries are missing codes"):
-                ReferenceDataProvider(make_config(industries=industries)).prepare_signal(
+                ReferenceDataProvider(make_config(data_dir=root / "industries_case")).prepare_signal(
                     date="2024-01-03", cache=cache,
                 )
 
     def test_market_wide_industries_are_filtered_to_the_legal_universe(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "industries.csv"
+            path = source_path(Path(directory), "industries")
             pd.DataFrame([
                 ("2024-01-03", "000001.SZ", "Technology"),
                 ("2024-01-03", "600000.SH", "Financials"),
                 ("2024-01-03", "999999.SZ", "Other"),
             ], columns=["date", "code", "industry"]).to_csv(path, index=False)
-            provider = ReferenceDataProvider(make_config(industries=path))
+            provider = ReferenceDataProvider(make_config(data_dir=directory))
             cache = MemoryCache(market_context())
             provider.prepare_signal(date="2024-01-03", cache=cache)
             inputs = cache.values[Topic.REFERENCE_PORTFOLIO, "2024-01-03"]
@@ -187,16 +195,18 @@ class ReferenceDataProviderTests(unittest.TestCase):
              ["date", "benchmark_return"], "duplicate keys"),
             ("weights", [("2024-01-02", "000001.SZ", -0.1), ("2024-01-02", "600000.SH", 1.1)],
              ["date", "code", "benchmark_weight"], "nonnegative"),
-            ("weights", [("2024-01-02", "000001.SZ", 0.4), ("2024-01-02", "600000.SH", 0.5)],
-             ["date", "code", "benchmark_weight"], "sum to one"),
+            ("weights", [("2024-01-02", "000001.SZ", 0.0), ("2024-01-02", "600000.SH", 0.0)],
+             ["date", "code", "benchmark_weight"], "positive finite sum"),
+            ("weights", [("2024-01-02", "000001.SZ", 1e308), ("2024-01-02", "600000.SH", 1e308)],
+             ["date", "code", "benchmark_weight"], "positive finite sum"),
             ("industries", [("2024-01-02", "000001.SZ", None)],
              ["date", "code", "industry"], "nonempty strings"),
         )
         for kind, rows, columns, message in cases:
             with self.subTest(kind=kind, message=message), tempfile.TemporaryDirectory() as directory:
-                path = Path(directory) / f"{kind}.csv"
+                path = source_path(Path(directory), kind)
                 pd.DataFrame(rows, columns=columns).to_csv(path, index=False)
-                config = make_config(**{kind: path})
+                config = make_config(data_dir=directory)
                 provider = ReferenceDataProvider(config)
                 cache = MemoryCache(market_context("2024-01-02"))
                 with self.assertRaisesRegex(ValueError, message):
@@ -207,11 +217,11 @@ class ReferenceDataProviderTests(unittest.TestCase):
 
     def test_weights_date_slice_is_exact_and_requires_same_day_keys(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "weights.parquet"
+            path = source_path(Path(directory), "weights", "parquet")
             pd.DataFrame([
                 ("2024-01-02", "000001.SZ", 0.4), ("2024-01-02", "600000.SH", 0.6),
             ], columns=["date", "code", "benchmark_weight"]).to_parquet(path, index=False)
-            provider = ReferenceDataProvider(make_config(weights=path))
+            provider = ReferenceDataProvider(make_config(data_dir=directory))
             with self.assertRaisesRegex(ValueError, "no data for 2024-01-03"):
                 provider.prepare_signal(date="2024-01-03", cache=MemoryCache(market_context()))
 

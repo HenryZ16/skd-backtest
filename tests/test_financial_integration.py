@@ -7,7 +7,7 @@ import unittest
 
 import pandas as pd
 
-from skd_backtest import BacktestEngine, CostConfig, DataCapabilities, FeeScheduleEntry, OptimizerConfig, ReferenceSources
+from skd_backtest import BacktestEngine, CostConfig, FeeScheduleEntry, OptimizerConfig
 from skd_backtest.schemas import METRIC_NAMES, RESULT_COLUMNS, SOURCE_COLUMNS
 
 
@@ -37,7 +37,7 @@ class FinancialIntegrationTest(unittest.TestCase):
             pd.DataFrame(rows).to_parquet(folder / "201801.parquet", index=False)
         self.model_dates = []
 
-    def inference(self, *, as_of_date, data):
+    def inference(self, *, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
         self.model_dates.append(as_of_date)
         self.assertNotIn("raw_open", data["MarketData"])
         self.assertNotIn("upper_limit", data["MarketData"])
@@ -55,6 +55,74 @@ class FinancialIntegrationTest(unittest.TestCase):
                       optimizer_config=OptimizerConfig(top_k=1))
         config.update(options)
         return BacktestEngine(**config)
+
+    def test_native_weights_industries_and_suspended_constituent_exit(self):
+        for name in SOURCE_COLUMNS:
+            path = self.root / name / "2018" / "01" / "201801.parquet"
+            frame = pd.read_parquet(path)
+            if name == "Barra_factor":
+                change = (frame["日期"] >= 20180104) & frame["代码"].eq("SH600000")
+                frame.loc[change, "代码"] = "SH600002"
+            else:
+                added = frame.loc[frame["代码"].eq("SH600000")].copy()
+                added["代码"] = "SH600002"
+                frame = pd.concat([frame, added], ignore_index=True)
+                if name == "MarketData":
+                    frame.loc[(frame["日期"] == 20180105) & frame["代码"].eq("SH600000"), "is_suspend"] = True
+            frame.to_parquet(path, index=False)
+        source = self.root / "HS300_weight" / "2018"
+        source.mkdir(parents=True)
+        pd.DataFrame([
+            (day, code, code, weight, "天软预估", 20171229)
+            for day in (20180102, 20180104)
+            for code, weight in ((("SH600000", 59.99), ("SZ000001", 40.)) if day == 20180102
+                                 else (("SH600002", 20.), ("SZ000001", 80.)))
+        ], columns=["日期", "代码", "名称", "权重", "权重来源", "指数成份日"]).to_csv(
+            source / "hs300_weight_2018.csv", encoding="gbk", index=False)
+        industries = self.root / "HS300_industry" / "2018"
+        industries.mkdir(parents=True)
+        pd.DataFrame([
+            (day, code, "申万电子" if code.startswith("SH") else "申万银行",
+             "SW801080" if code.startswith("SH") else "SW801780")
+            for day in (20180102, 20180104)
+            for code in (("SH600000", "SZ000001") if day == 20180102 else ("SH600002", "SZ000001"))
+        ], columns=["日期", "代码", "行业名称", "行业代码"]).to_csv(
+            industries / "hs300_industry_2018.csv", encoding="gbk", index=False)
+
+        def inference(*, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
+            today = data["Barra_factor"].loc[lambda f: f["日期"].eq(int(as_of_date.replace("-", "")))]
+            return pd.DataFrame({"date": as_of_date, "code": today["代码"],
+                                 "score": today["代码"].str.startswith("SH").astype(float)})
+
+        engine = self.engine(
+            inference=inference, output_dir=self.root / "native_output", friendly_output=False,
+
+            optimizer_config=OptimizerConfig(method="barra",
+                single_name_weight_limit=.8, active_weight_limit=.6,
+                industry_exposure_limit=.05, barra_style_exposure_limit=.01, turnover_limit=2.),
+        )
+        metrics = engine.run()
+        targets = engine.tables["target_weights"]
+        last = targets.loc[targets.signal_date.eq("2018-01-04")].set_index("code")
+        self.assertEqual(last.loc["SH600000", "target_weight"], 0.)
+        self.assertEqual(last.loc["SH600002", "benchmark_weight"], .2)
+        self.assertAlmostEqual(last.loc["SH600002", "target_weight"], .25)
+        self.assertAlmostEqual(last.benchmark_weight.sum(), 1.)
+        orders = engine.tables["orders"]
+        self.assertTrue(((orders.code == "SH600000") & (orders.reject_reason == "SUSPENDED")).any())
+        last_positions = engine.tables["positions"].loc[lambda f: f.date.eq("2018-01-05")]
+        self.assertIn("SH600000", last_positions.code.tolist())
+        self.assertTrue(engine.tables["equity_curve"].cash.ge(-1e-8).all())
+        self.assertEqual(engine.tables["rankic"].n_stocks.tolist(), [2, 2])
+        self.assertIsNone(metrics["tracking_error"])
+        # Both async and sequential inference must reproduce all audit results.
+        engine_sync = self.engine(
+            inference=inference, friendly_output=False, async_inference=False,
+            optimizer_config=engine.optimizer_config,
+        )
+        self.assertEqual(metrics, engine_sync.run())
+        for name in engine.tables:
+            pd.testing.assert_frame_equal(engine.tables[name], engine_sync.tables[name])
 
     def test_real_components_match_hand_computed_adjusted_portfolio(self):
         engine = self.engine(output_dir=self.root / "output")
@@ -105,6 +173,49 @@ class FinancialIntegrationTest(unittest.TestCase):
             self.assertEqual(exported.columns.tolist(), list(columns))
             self.assertEqual(len(exported), len(engine.tables[name]))
 
+    def test_rankic_and_rankicir_use_full_universe_independently_of_top_k(self):
+        for name in SOURCE_COLUMNS:
+            path = self.root / name / "2018/01/201801.parquet"
+            frame = pd.read_parquet(path)
+            third = frame.loc[frame["代码"].eq("SZ000001")].copy()
+            third["代码"], third["名称"] = "SZ000002", "SZ000002"
+            if name == "MarketData":
+                for column in ("open", "high", "low", "close"):
+                    third[column] = [10., 10., 11., 20., 23., 23.]
+            pd.concat([frame, third], ignore_index=True).to_parquet(path, index=False)
+
+        def inference(as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
+            return pd.DataFrame({
+                "date": as_of_date, "code": ["SH600000", "SZ000001", "SZ000002"],
+                "score": [3., 1., 2.] if as_of_date == "2018-01-02" else [1., 2., 3.],
+            })
+
+        baseline = None
+        for top_k in (1, 2, 3):
+            with self.subTest(top_k=top_k):
+                engine = self.engine(inference=inference, friendly_output=False,
+                                     optimizer_config=OptimizerConfig(top_k=top_k))
+                metrics = engine.run()
+                rankic = engine.tables["rankic"]
+                targets = engine.tables["target_weights"]
+                selected = targets.loc[targets.target_weight.gt(0)].groupby("signal_date").size()
+                self.assertEqual(selected.tolist(), [top_k, top_k])
+                self.assertEqual(rankic.n_stocks.tolist(), [3, 3])
+                self.assertEqual(len(engine.tables["predictions"]), 6)
+                # Full-universe ranks give 1 and 0.5; selecting the top two gives 1 and -1.
+                for actual, expected in zip(rankic.rankic, [1., .5]):
+                    self.assertAlmostEqual(actual, expected)
+                self.assertAlmostEqual(metrics["mean_rankic"], .75)
+                self.assertAlmostEqual(metrics["rankic_std"], .125 ** .5)
+                self.assertAlmostEqual(metrics["rankic_ir"], .75 / (.125 ** .5))
+                if baseline is None:
+                    baseline = engine
+                else:
+                    for name in ("predictions", "rankic"):
+                        pd.testing.assert_frame_equal(baseline.tables[name], engine.tables[name])
+                    for name in ("mean_rankic", "rankic_std", "rankic_ir", "positive_rankic_ratio"):
+                        self.assertEqual(baseline.metrics[name], metrics[name])
+
     def test_fees_and_slippage_match_cash_and_asset_accounting(self):
         costs = CostConfig(
             commission_rate=0.01, slippage=0.01,
@@ -143,7 +254,7 @@ class FinancialIntegrationTest(unittest.TestCase):
         market.to_parquet(market_path, index=False)
         engine = self.engine(
             initial_cash=10000.0, price_mode="raw_price",
-            data_capabilities=DataCapabilities(raw_prices=True, price_limits=True),
+
         )
         engine.run()
         self.assertAlmostEqual(engine.account["portfolio_value"], 13200.0)
@@ -156,8 +267,9 @@ class FinancialIntegrationTest(unittest.TestCase):
         self.assertAlmostEqual(engine.metrics["total_return"], 0.32)
         self.assertAlmostEqual(engine.metrics["turnover"], 3.0)
 
-    def test_benchmark_is_external_and_reference_sources_reload_each_run(self):
-        path = self.root / "benchmark.parquet"
+    def test_benchmark_directory_reloads_each_run(self):
+        path = self.root / "HS300_return" / "benchmark.parquet"
+        path.parent.mkdir()
         benchmark = pd.DataFrame({
             "date": ["2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05"],
             "benchmark_return": [0.01] * 4,
@@ -165,8 +277,7 @@ class FinancialIntegrationTest(unittest.TestCase):
         benchmark.to_parquet(path, index=False)
         engine = self.engine(
             benchmark_mode="csi300",
-            data_capabilities=DataCapabilities(benchmark_returns=True),
-            reference_sources=ReferenceSources(benchmark_returns=path),
+
         )
         engine.run()
         first = engine.tables["equity_curve"]

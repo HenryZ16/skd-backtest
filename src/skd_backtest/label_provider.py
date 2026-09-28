@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from .config import BacktestConfig
+from .data_provider import raw_price_columns
 from .contracts import Topic
 from .runtime_cache import CacheView
 from .schemas import LABEL_COLUMNS
@@ -91,31 +92,19 @@ class LabelProvider:
         })
         return dates
 
-    @staticmethod
-    def _price_source(basis: str, capabilities) -> tuple[str, bool]:
-        if basis == "adjusted_open":
-            return "open", False
-        if capabilities.raw_prices:
-            return "raw_open", False
-        if capabilities.adjustment_factors:
-            return "open", True
-        raise ValueError("raw_open labels require raw_prices or adjustment_factors")
-
     def _read_endpoint_prices(
         self, endpoints: pd.DataFrame, files: dict[tuple[int, int], Path],
-        basis: str, capabilities,
+        basis: str,
     ) -> pd.DataFrame:
-        source_column, use_factor = self._price_source(basis, capabilities)
-        columns = ["日期", "代码", source_column, "is_suspend"]
-        if use_factor:
-            columns.append("adjustment_factor")
-
         parts = []
         grouped = endpoints.assign(month=endpoints["date"].str[:7]).groupby("month", sort=True)
         for month_text, requests in grouped:
             year, month = map(int, month_text.split("-"))
             month_key = (year, month)
             path = files[month_key]
+            source, use_factor = raw_price_columns(path, ("open",)) if basis == "raw_open" else (["open"], False)
+            source_column = source[0]
+            columns = ["日期", "代码", *source, "is_suspend"]
             date_map = {
                 int(value.replace("-", "")): value
                 for value in requests["date"].drop_duplicates().tolist()
@@ -139,16 +128,11 @@ class LabelProvider:
             table["code"] = table["代码"]
             table["present"] = True
             table["source_price"] = table[source_column]
-            if use_factor:
-                table["factor"] = table["adjustment_factor"]
-            keep = ["date", "code", "present", "is_suspend", "source_price"]
-            if use_factor:
-                keep.append("factor")
+            table["factor"] = table["adjustment_factor"] if use_factor else 1.0
+            keep = ["date", "code", "present", "is_suspend", "source_price", "factor"]
             parts.append(table.loc[:, keep])
 
-        price_columns = ["date", "code", "present", "is_suspend", "source_price"]
-        if use_factor:
-            price_columns.append("factor")
+        price_columns = ["date", "code", "present", "is_suspend", "source_price", "factor"]
         prices = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=price_columns)
         if prices.duplicated(["date", "code"]).any():
             raise ValueError("MarketData has duplicate date/code rows for label endpoints")
@@ -260,13 +244,13 @@ class LabelProvider:
             ignore_index=True,
         )
         if not endpoints.empty:
-            prices = self._read_endpoint_prices(endpoints, files, basis, context.data_capabilities)
+            prices = self._read_endpoint_prices(endpoints, files, basis)
             joined = endpoints.merge(
                 prices, on=["date", "code"], how="left", sort=False, validate="many_to_one",
             )
             entry_values, exit_values = [None] * len(labels), [None] * len(labels)
             entry_issues, exit_issues = [None] * len(labels), [None] * len(labels)
-            factor_mode = basis == "raw_open" and not context.data_capabilities.raw_prices
+            factor_mode = basis == "raw_open"
             value_columns = ["row_index", "endpoint", "present", "is_suspend", "source_price"]
             if factor_mode:
                 value_columns.append("factor")

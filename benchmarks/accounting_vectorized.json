@@ -1,0 +1,396 @@
+{
+  "description": "Accounting-only comparison using the same current engine, data and submitted model; each run in a fresh process, with CSV output enabled.",
+  "config": {
+    "submission_dir": "D:/skd-backtest-submit",
+    "config_path": "D:/skd-backtest-submit/config.toml",
+    "data_dir": "D:/Data",
+    "start_date": "2016-01-01",
+    "end_date": "2022-12-31",
+    "optimizer": "top_k",
+    "top_k": 300,
+    "friendly_output": false
+  },
+  "method": {
+    "run_order": [
+      "vector-1",
+      "scalar-1",
+      "scalar-2",
+      "vector-2"
+    ],
+    "repeats_per_variant": 2,
+    "aggregation": "arithmetic mean",
+    "timer": "engine.performance.elapsed_seconds",
+    "isolated_outputs": "D:\\skd-backtest\\result\\vectorized-accounting-kz1iekrz",
+    "comparison": "Only PortfolioAccounting replaced for scalar runs; all other code uses current workspace. Process startup and imports excluded; output export included. OS cache already warm. No memory sampler.",
+    "caveat": "Local timings vary; this compares accounting implementations, not complete release versions."
+  },
+  "environment": {
+    "python": "3.13.13",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "numpy": "2.5.3",
+      "pandas": "3.0.6",
+      "pyarrow": "25.0.1",
+      "lightgbm": "4.7.0"
+    }
+  },
+  "provenance": {
+    "scalar_git_commit": "a2d3dab9cfec237290693314247c6044cf64c2aa",
+    "scalar_git_blob": "64a3414c79659262a1bdc5c51d860938f6bbff6f",
+    "vector_accounting_sha256": "ee2685bb3d9203f3f009786394e358a19b0b94f703a97e5804399f62bf4a79c6",
+    "config_sha256": "c424975196e1075c82a9255865b92b36be252209f37d56473598bc0dae131428"
+  },
+  "summary": {
+    "scalar": {
+      "elapsed_seconds_mean": 55.99591934999626,
+      "accounting_seconds_mean": 28.242393100692425
+    },
+    "vector": {
+      "elapsed_seconds_mean": 44.37225795000268,
+      "accounting_seconds_mean": 16.744443699659314
+    },
+    "elapsed_reduction_percent": 20.75805082749187,
+    "accounting_reduction_percent": 40.7116683067173
+  },
+  "verification": {
+    "all_four_output_hashes_identical": true,
+    "all_four_metrics_identical": true,
+    "full_suite_passed": 147,
+    "randomized_comparison": {
+      "randomized_cases": 400,
+      "matching_rejections": 79,
+      "exact_numeric_match": true,
+      "inputs_unchanged": true
+    }
+  },
+  "runs": {
+    "vector-1": {
+      "variant": "vector",
+      "performance": {
+        "elapsed_seconds": 47.77824949999922,
+        "playback_seconds": 44.41425889998209,
+        "inference_seconds": 12.180837300227722,
+        "inference_wait_seconds": 0.0014697001315653324,
+        "inference_calls": 341,
+        "trading_days": 1703,
+        "market_rows": 803524,
+        "days_per_second": 35.643834125819694,
+        "source_rows_per_second": 35400.54350463442,
+        "data": {
+          "calendar_files": 84,
+          "calendar_seconds": 0.15975970000727102,
+          "data_files": 252,
+          "data_bytes": 158772790,
+          "batches": 7,
+          "read_seconds": 4.084062699985225,
+          "wait_seconds": 0.21441350001259707,
+          "as_of_seconds": 2.780674499721499,
+          "source_rows": {
+            "Factor33_winsor": 590238,
+            "Barra_factor": 510900,
+            "MarketData": 590238
+          },
+          "delivered_rows": {
+            "Factor33_winsor": 23851800,
+            "Barra_factor": 23851800,
+            "MarketData": 23851800
+          },
+          "warmup_days": 0,
+          "seed_files": 0,
+          "seed_rows": 0,
+          "open_rows": 803524,
+          "close_rows": 803524,
+          "market_seconds": 5.179645300609991
+        }
+      },
+      "timings": {
+        "model_predict": 10.657719500013627,
+        "accounting_open": 7.297119700437179,
+        "accounting_close": 11.065828199411044,
+        "reference_data": 3.8909476999542676
+      },
+      "metrics": {
+        "mean_rankic": 0.12809314589634693,
+        "rankic_std": 0.1816216845037524,
+        "rankic_ir": 0.7052745174472845,
+        "positive_rankic_ratio": 0.7800586510263929,
+        "total_return": 0.10458336454924111,
+        "annualized_return": 0.01482758021973618,
+        "annualized_excess_return": null,
+        "annualized_volatility": 0.19821626110212553,
+        "maximum_drawdown": 0.32832043093074936,
+        "tracking_error": null,
+        "information_ratio": null,
+        "sharpe_ratio": 0.17391391315346774,
+        "turnover": 13.335115989094929,
+        "transaction_cost": 0.0,
+        "failed_orders": 6784
+      },
+      "rows": {
+        "predictions": 102300,
+        "rankic": 341,
+        "target_weights": 104033,
+        "orders": 104033,
+        "trades": 97249,
+        "positions": 512092,
+        "equity_curve": 1703
+      },
+      "output_sha256": {
+        "predictions.csv": "46a87580e214822c073ee976a13e7e9e0a48a99a9ef4001c3e1125427f52c2f0",
+        "rankic.csv": "6d552a1584646940299ea786e33c14583f18065250767519955bf89ffe89f49a",
+        "target_weights.csv": "bf5f2bc23cc834ef0452f4b1501560b497ca5db75726b10c79c87188b944831e",
+        "orders.csv": "dd4d9ed6606795e7aa88e5a4f719878a7418d1bf599bcdc29888ae70393c44b7",
+        "trades.csv": "40300781adb6ea238d4330e54ff31d9c3bc21ebc8b1c2657ed6c5732259b5b63",
+        "positions.csv": "2d895a0cc29a54f837c5c95dbf409f15a7a191505f8b21b125ec5c466cc1dc4e",
+        "equity_curve.csv": "9efbad8369c98f1be17d1bd83a5fbdbfcd932e1155bd2e4b834491eb2fd82a23",
+        "metrics.json": "ce6c0a8875da4df031e9ebab6bdb97edaedb51005cc0badd1e53b80dc3c22217"
+      }
+    },
+    "scalar-1": {
+      "variant": "scalar",
+      "performance": {
+        "elapsed_seconds": 58.204374399996595,
+        "playback_seconds": 54.97649050000473,
+        "inference_seconds": 14.633372800017241,
+        "inference_wait_seconds": 0.0013237998937256634,
+        "inference_calls": 341,
+        "trading_days": 1703,
+        "market_rows": 803524,
+        "days_per_second": 29.258969236513256,
+        "source_rows_per_second": 29059.259161113823,
+        "data": {
+          "calendar_files": 84,
+          "calendar_seconds": 0.15756790002342314,
+          "data_files": 252,
+          "data_bytes": 158772790,
+          "batches": 7,
+          "read_seconds": 4.695071299967822,
+          "wait_seconds": 0.21689039998454973,
+          "as_of_seconds": 2.7171243999910075,
+          "source_rows": {
+            "Factor33_winsor": 590238,
+            "Barra_factor": 510900,
+            "MarketData": 590238
+          },
+          "delivered_rows": {
+            "Factor33_winsor": 23851800,
+            "Barra_factor": 23851800,
+            "MarketData": 23851800
+          },
+          "warmup_days": 0,
+          "seed_files": 0,
+          "seed_rows": 0,
+          "open_rows": 803524,
+          "close_rows": 803524,
+          "market_seconds": 6.271704599552322
+        }
+      },
+      "timings": {
+        "model_predict": 12.104480999900261,
+        "accounting_open": 12.77066960040247,
+        "accounting_close": 16.439967600890668,
+        "reference_data": 3.7292680996179115
+      },
+      "metrics": {
+        "mean_rankic": 0.12809314589634693,
+        "rankic_std": 0.1816216845037524,
+        "rankic_ir": 0.7052745174472845,
+        "positive_rankic_ratio": 0.7800586510263929,
+        "total_return": 0.10458336454924111,
+        "annualized_return": 0.01482758021973618,
+        "annualized_excess_return": null,
+        "annualized_volatility": 0.19821626110212553,
+        "maximum_drawdown": 0.32832043093074936,
+        "tracking_error": null,
+        "information_ratio": null,
+        "sharpe_ratio": 0.17391391315346774,
+        "turnover": 13.335115989094929,
+        "transaction_cost": 0.0,
+        "failed_orders": 6784
+      },
+      "rows": {
+        "predictions": 102300,
+        "rankic": 341,
+        "target_weights": 104033,
+        "orders": 104033,
+        "trades": 97249,
+        "positions": 512092,
+        "equity_curve": 1703
+      },
+      "output_sha256": {
+        "predictions.csv": "46a87580e214822c073ee976a13e7e9e0a48a99a9ef4001c3e1125427f52c2f0",
+        "rankic.csv": "6d552a1584646940299ea786e33c14583f18065250767519955bf89ffe89f49a",
+        "target_weights.csv": "bf5f2bc23cc834ef0452f4b1501560b497ca5db75726b10c79c87188b944831e",
+        "orders.csv": "dd4d9ed6606795e7aa88e5a4f719878a7418d1bf599bcdc29888ae70393c44b7",
+        "trades.csv": "40300781adb6ea238d4330e54ff31d9c3bc21ebc8b1c2657ed6c5732259b5b63",
+        "positions.csv": "2d895a0cc29a54f837c5c95dbf409f15a7a191505f8b21b125ec5c466cc1dc4e",
+        "equity_curve.csv": "9efbad8369c98f1be17d1bd83a5fbdbfcd932e1155bd2e4b834491eb2fd82a23",
+        "metrics.json": "ce6c0a8875da4df031e9ebab6bdb97edaedb51005cc0badd1e53b80dc3c22217"
+      }
+    },
+    "scalar-2": {
+      "variant": "scalar",
+      "performance": {
+        "elapsed_seconds": 53.78746429999592,
+        "playback_seconds": 50.726953599980334,
+        "inference_seconds": 13.99834109962103,
+        "inference_wait_seconds": 0.0014056999352760613,
+        "inference_calls": 341,
+        "trading_days": 1703,
+        "market_rows": 803524,
+        "days_per_second": 31.66165243450841,
+        "source_rows_per_second": 31445.542600158013,
+        "data": {
+          "calendar_files": 84,
+          "calendar_seconds": 0.13713230000576004,
+          "data_files": 252,
+          "data_bytes": 158772790,
+          "batches": 7,
+          "read_seconds": 4.825581300014164,
+          "wait_seconds": 0.20434640004532412,
+          "as_of_seconds": 1.8500206000171602,
+          "source_rows": {
+            "Factor33_winsor": 590238,
+            "Barra_factor": 510900,
+            "MarketData": 590238
+          },
+          "delivered_rows": {
+            "Factor33_winsor": 23851800,
+            "Barra_factor": 23851800,
+            "MarketData": 23851800
+          },
+          "warmup_days": 0,
+          "seed_files": 0,
+          "seed_rows": 0,
+          "open_rows": 803524,
+          "close_rows": 803524,
+          "market_seconds": 5.557226001255913
+        }
+      },
+      "timings": {
+        "model_predict": 11.69258930007345,
+        "accounting_open": 11.547387199912919,
+        "accounting_close": 15.726761800178792,
+        "reference_data": 3.5301870001130737
+      },
+      "metrics": {
+        "mean_rankic": 0.12809314589634693,
+        "rankic_std": 0.1816216845037524,
+        "rankic_ir": 0.7052745174472845,
+        "positive_rankic_ratio": 0.7800586510263929,
+        "total_return": 0.10458336454924111,
+        "annualized_return": 0.01482758021973618,
+        "annualized_excess_return": null,
+        "annualized_volatility": 0.19821626110212553,
+        "maximum_drawdown": 0.32832043093074936,
+        "tracking_error": null,
+        "information_ratio": null,
+        "sharpe_ratio": 0.17391391315346774,
+        "turnover": 13.335115989094929,
+        "transaction_cost": 0.0,
+        "failed_orders": 6784
+      },
+      "rows": {
+        "predictions": 102300,
+        "rankic": 341,
+        "target_weights": 104033,
+        "orders": 104033,
+        "trades": 97249,
+        "positions": 512092,
+        "equity_curve": 1703
+      },
+      "output_sha256": {
+        "predictions.csv": "46a87580e214822c073ee976a13e7e9e0a48a99a9ef4001c3e1125427f52c2f0",
+        "rankic.csv": "6d552a1584646940299ea786e33c14583f18065250767519955bf89ffe89f49a",
+        "target_weights.csv": "bf5f2bc23cc834ef0452f4b1501560b497ca5db75726b10c79c87188b944831e",
+        "orders.csv": "dd4d9ed6606795e7aa88e5a4f719878a7418d1bf599bcdc29888ae70393c44b7",
+        "trades.csv": "40300781adb6ea238d4330e54ff31d9c3bc21ebc8b1c2657ed6c5732259b5b63",
+        "positions.csv": "2d895a0cc29a54f837c5c95dbf409f15a7a191505f8b21b125ec5c466cc1dc4e",
+        "equity_curve.csv": "9efbad8369c98f1be17d1bd83a5fbdbfcd932e1155bd2e4b834491eb2fd82a23",
+        "metrics.json": "ce6c0a8875da4df031e9ebab6bdb97edaedb51005cc0badd1e53b80dc3c22217"
+      }
+    },
+    "vector-2": {
+      "variant": "vector",
+      "performance": {
+        "elapsed_seconds": 40.966266400006134,
+        "playback_seconds": 37.93941150000319,
+        "inference_seconds": 10.576010600023437,
+        "inference_wait_seconds": 0.0010974999167956412,
+        "inference_calls": 341,
+        "trading_days": 1703,
+        "market_rows": 803524,
+        "days_per_second": 41.570788593996575,
+        "source_rows_per_second": 41287.04294125634,
+        "data": {
+          "calendar_files": 84,
+          "calendar_seconds": 0.1375601000036113,
+          "data_files": 252,
+          "data_bytes": 158772790,
+          "batches": 7,
+          "read_seconds": 3.846745600050781,
+          "wait_seconds": 0.20516349998069927,
+          "as_of_seconds": 1.7925754997122567,
+          "source_rows": {
+            "Factor33_winsor": 590238,
+            "Barra_factor": 510900,
+            "MarketData": 590238
+          },
+          "delivered_rows": {
+            "Factor33_winsor": 23851800,
+            "Barra_factor": 23851800,
+            "MarketData": 23851800
+          },
+          "warmup_days": 0,
+          "seed_files": 0,
+          "seed_rows": 0,
+          "open_rows": 803524,
+          "close_rows": 803524,
+          "market_seconds": 4.4073118008091114
+        }
+      },
+      "timings": {
+        "model_predict": 9.421753500209888,
+        "accounting_open": 5.758766199229285,
+        "accounting_close": 9.36717330024112,
+        "reference_data": 3.639199499913957
+      },
+      "metrics": {
+        "mean_rankic": 0.12809314589634693,
+        "rankic_std": 0.1816216845037524,
+        "rankic_ir": 0.7052745174472845,
+        "positive_rankic_ratio": 0.7800586510263929,
+        "total_return": 0.10458336454924111,
+        "annualized_return": 0.01482758021973618,
+        "annualized_excess_return": null,
+        "annualized_volatility": 0.19821626110212553,
+        "maximum_drawdown": 0.32832043093074936,
+        "tracking_error": null,
+        "information_ratio": null,
+        "sharpe_ratio": 0.17391391315346774,
+        "turnover": 13.335115989094929,
+        "transaction_cost": 0.0,
+        "failed_orders": 6784
+      },
+      "rows": {
+        "predictions": 102300,
+        "rankic": 341,
+        "target_weights": 104033,
+        "orders": 104033,
+        "trades": 97249,
+        "positions": 512092,
+        "equity_curve": 1703
+      },
+      "output_sha256": {
+        "predictions.csv": "46a87580e214822c073ee976a13e7e9e0a48a99a9ef4001c3e1125427f52c2f0",
+        "rankic.csv": "6d552a1584646940299ea786e33c14583f18065250767519955bf89ffe89f49a",
+        "target_weights.csv": "bf5f2bc23cc834ef0452f4b1501560b497ca5db75726b10c79c87188b944831e",
+        "orders.csv": "dd4d9ed6606795e7aa88e5a4f719878a7418d1bf599bcdc29888ae70393c44b7",
+        "trades.csv": "40300781adb6ea238d4330e54ff31d9c3bc21ebc8b1c2657ed6c5732259b5b63",
+        "positions.csv": "2d895a0cc29a54f837c5c95dbf409f15a7a191505f8b21b125ec5c466cc1dc4e",
+        "equity_curve.csv": "9efbad8369c98f1be17d1bd83a5fbdbfcd932e1155bd2e4b834491eb2fd82a23",
+        "metrics.json": "ce6c0a8875da4df031e9ebab6bdb97edaedb51005cc0badd1e53b80dc3c22217"
+      }
+    }
+  }
+}

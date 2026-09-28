@@ -10,12 +10,25 @@ from time import perf_counter
 
 import pandas as pd
 import pyarrow as pa
+import pyarrow.parquet as pq
 
 from .config import BacktestConfig
 from .schemas import SOURCE_COLUMNS
 
 
 logger = logging.getLogger(__name__)
+
+
+def raw_price_columns(path: Path, fields) -> tuple[list[str], bool]:
+    """Choose observed raw prices or adjustment factors from this file's schema."""
+    columns = set(pq.read_schema(path).names)
+    raw = [f"raw_{name}" for name in fields]
+    if set(raw).issubset(columns):
+        return raw, False
+    adjusted = [*fields, "adjustment_factor"]
+    if set(adjusted).issubset(columns):
+        return adjusted, True
+    raise ValueError(f"raw_price requires columns {raw} or {adjusted} in {path}")
 
 
 @dataclass
@@ -65,23 +78,12 @@ class DataProvider:
     def __init__(self, config: BacktestConfig, *, load_research: bool = True):
         self.config = config
         self.load_research = load_research
-        capabilities = config.data_capabilities
-        self._raw_price_source = None
-        if config.price_mode == "raw_price":
-            if capabilities.raw_prices:
-                self._raw_price_source = "raw"
-            elif capabilities.adjustment_factors:
-                self._raw_price_source = "factor"
-
         self._datasets = dict(SOURCE_COLUMNS) if load_research else {
             "MarketData": ("日期", "代码", "open", "close", "is_suspend"),
         }
         market_columns = list(self._datasets["MarketData"])
         if config.price_mode == "raw_price":
-            if self._raw_price_source == "raw":
-                market_columns.extend(("raw_open", "raw_high", "raw_low", "raw_close"))
-            elif self._raw_price_source == "factor":
-                market_columns.extend(("open", "high", "low", "close", "adjustment_factor"))
+            market_columns.extend(("raw_open", "raw_high", "raw_low", "raw_close"))
             market_columns.extend(("upper_limit", "lower_limit"))
         self._datasets["MarketData"] = tuple(dict.fromkeys(market_columns))
         self._market_open_column = "raw_open" if config.price_mode == "raw_price" else "open"
@@ -117,23 +119,21 @@ class DataProvider:
         return self.config.data_dir / dataset / str(year) / f"{month:02d}" / f"{year}{month:02d}.parquet"
 
     def _read_parquet(self, path: Path, columns, **kwargs):
+        raw_fields = [name.removeprefix("raw_") for name in columns if name.startswith("raw_")]
+        use_factor = False
+        if raw_fields:
+            source, use_factor = raw_price_columns(path, raw_fields)
+            columns = list(dict.fromkeys([name for name in columns if not name.startswith("raw_")] + source))
         try:
-            return pd.read_parquet(path, columns=list(columns), **kwargs)
+            table = pd.read_parquet(path, columns=list(columns), **kwargs)
+            if use_factor:
+                factor = self._adjustment_factor(table, path)
+                for name in raw_fields:
+                    table[f"raw_{name}"] = pd.to_numeric(table[name], errors="coerce") / factor
+            return table
         except (pa.ArrowInvalid, KeyError) as exc:
             requested = ", ".join(columns)
             raise ValueError(f"cannot read required columns ({requested}) from {path}: {exc}") from exc
-
-    def _validate_market_mode(self) -> None:
-        capabilities = self.config.data_capabilities
-        missing = [name for name in ("adjusted_prices", "suspension")
-                   if not getattr(capabilities, name)]
-        if missing:
-            raise ValueError("missing data capabilities: " + ", ".join(missing))
-        if self.config.price_mode == "raw_price":
-            if self._raw_price_source is None:
-                raise NotImplementedError("raw_price requires raw_prices or adjustment_factors capability")
-            if not capabilities.price_limits:
-                raise ValueError("missing data capabilities: price_limits")
 
     @staticmethod
     def _adjustment_factor(table: pd.DataFrame, path: Path) -> pd.Series:
@@ -143,12 +143,6 @@ class DataProvider:
         return factor
 
     def _restore_raw_prices(self, table: pd.DataFrame, path: Path) -> pd.DataFrame:
-        if self._raw_price_source == "factor":
-            factor = self._adjustment_factor(table, path)
-            for name in ("open", "high", "low", "close"):
-                if name in table:
-                    adjusted = pd.to_numeric(table[name], errors="coerce")
-                    table[f"raw_{name}"] = adjusted / factor
         if self.config.price_mode == "raw_price" and {"upper_limit", "lower_limit"}.issubset(table):
             upper = pd.to_numeric(table["upper_limit"], errors="coerce")
             lower = pd.to_numeric(table["lower_limit"], errors="coerce")
@@ -161,14 +155,8 @@ class DataProvider:
         return table
 
     def _read_seed_prices(self, path: Path) -> pd.DataFrame:
-        close_column = "close"
+        close_column = self._market_close_column
         columns = ["日期", "代码", close_column, "is_suspend"]
-        if self.config.price_mode == "raw_price":
-            if self._raw_price_source == "raw":
-                close_column = "raw_close"
-                columns[2] = close_column
-            elif self._raw_price_source == "factor":
-                columns.append("adjustment_factor")
         seed = self._read_parquet(
             path, columns, filters=[("日期", "<", self._first_date)],
         )
@@ -197,7 +185,6 @@ class DataProvider:
         self._batch_index = -1
         self._current_date = None
         self._batches = []
-        self._validate_market_mode()
         started = perf_counter()
         start = int(self.config.start_date.replace("-", ""))
         end = int(self.config.end_date.replace("-", ""))

@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import tomllib
 
-from .config import CostConfig, DataCapabilities, FeeScheduleEntry, OptimizerConfig, ReferenceSources
+from .config import CostConfig, FeeScheduleEntry, OptimizerConfig
 from .engine import BacktestEngine
 
 
@@ -31,7 +31,7 @@ class InferenceModel:
         # naive 模型没有训练参数，保留标准 model_dir 接口。
         logging.getLogger(__name__).debug("[UserModel.__init__] model_dir=%s", model_dir)
 
-    def predict(self, as_of_date, data):
+    def predict(self, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
         # naive 模型给当日全部沪深300成分股相同的零分。
         day = int(as_of_date.replace("-", ""))
         codes = data["Barra_factor"].loc[lambda table: table["日期"] == day, "代码"]
@@ -63,7 +63,7 @@ def load_config(path):
             document = tomllib.load(stream)
     else:
         raise ValueError("evaluation config must be JSON or TOML")
-    allowed = {"backtest", "optimizer", "costs", "data_capabilities", "reference_sources"}
+    allowed = {"backtest", "optimizer", "costs"}
     if not isinstance(document, dict) or set(document) - allowed:
         raise ValueError("unknown evaluation configuration section")
     options = dict(document["backtest"])
@@ -74,17 +74,11 @@ def load_config(path):
     if "inference" in options or "submission_dir" in options:
         raise ValueError("submission is selected only by --submission")
     optimizer = dict(document.get("optimizer", {}))
-    if "barra_factors" in optimizer:
-        optimizer["barra_factors"] = tuple(optimizer["barra_factors"])
     costs = dict(document.get("costs", {}))
     costs["fee_schedule"] = tuple(FeeScheduleEntry(**entry) for entry in costs.get("fee_schedule", []))
-    sources = {name: path.parent / value for name, value in document.get("reference_sources", {}).items()
-               if value is not None}
     options.update(
         optimizer_config=OptimizerConfig(**optimizer),
         cost_config=CostConfig(**costs),
-        data_capabilities=DataCapabilities(**document.get("data_capabilities", {})),
-        reference_sources=ReferenceSources(**sources),
     )
     return options
 

@@ -48,13 +48,15 @@ class DataFlowTest(unittest.TestCase):
                 part.iloc[::-1].to_parquet(folder / f"{month}.parquet", index=False)
 
     def make_engine(self, **kwargs):
-        config = dict(
-            data_dir=self.root, start_date="2016-12-01", end_date="2017-03-02",
-            inference=lambda as_of_date, data: pd.DataFrame({
+        def inference(as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
+            return pd.DataFrame({
                 "date": as_of_date, "score": 0.0,
                 "code": data["Barra_factor"].loc[
                     lambda frame: frame["日期"] == int(as_of_date.replace("-", "")), "代码"],
-            }),
+            })
+        config = dict(
+            data_dir=self.root, start_date="2016-12-01", end_date="2017-03-02",
+            inference=inference,
             lookback=4, read_batch_months=1, rebalance_interval=1,
         )
         config.update(kwargs)
@@ -148,7 +150,7 @@ class DataFlowTest(unittest.TestCase):
                 finished.set()
             return result
 
-        def inference(**kwargs):
+        def inference(*, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
             self.assertTrue(entered.wait(5), "next batch was not started during current inference")
             release.set()
             self.assertTrue(finished.wait(5), "reader cannot progress concurrently with inference")
@@ -291,7 +293,7 @@ class DataFlowTest(unittest.TestCase):
                 self.make_engine(**{field: 0})
         with self.assertRaises(ValueError):
             self.make_engine(start_date="2017-04-01")
-        with redirect_stdout(StringIO()), self.assertRaisesRegex(NotImplementedError, "raw_price"):
+        with redirect_stdout(StringIO()), self.assertRaisesRegex(ValueError, "raw_price"):
             self.make_engine(price_mode="raw_price").run()
 
 

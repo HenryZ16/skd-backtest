@@ -5,7 +5,6 @@ import pandas as pd
 from skd_backtest.config import (
     BacktestConfig,
     CostConfig,
-    DataCapabilities,
     OptimizerConfig,
 )
 from skd_backtest.contracts import (
@@ -83,7 +82,7 @@ def make_cache(
         risk_free_rate=0.0,
         output_dir=None,
         benchmark_mode=benchmark_mode,
-        data_capabilities=DataCapabilities(),
+
     )
     packets = {
         (Topic.SIGNAL_SCORES, signal_date): pd.DataFrame(
@@ -140,41 +139,13 @@ class PortfolioOptimizerTests(unittest.TestCase):
         target = plan.weights.set_index("code").target_weight
         self.assertEqual(target.to_dict(), {"A": 0.0, "B": 1.0, "C": 0.0})
 
-    def test_benchmark_tilt_hand_calculation_and_name_cap(self):
-        weights = {"A": 0.6, "B": 0.3, "C": 0.1}
+    def test_top_k_name_cap_with_cash_allowed(self):
         plan, _, _ = self.optimize(
-            OptimizerConfig(method="benchmark_tilt", single_name_weight_limit=0.35),
-            {"A": 1.0, "B": 2.0, "C": 3.0},
-            held=(),
-            benchmark_weights=weights,
-            benchmark_mode="csi300",
+            OptimizerConfig(top_k=2, fully_invested=False, single_name_weight_limit=.35),
+            {"A": 1., "B": 2., "C": 3.}, held=(),
         )
-        target = plan.weights.set_index("code")
-        self.assertAlmostEqual(target.loc["A", "target_weight"], 0.35)
-        self.assertAlmostEqual(target.loc["B", "target_weight"], 0.35)
-        self.assertAlmostEqual(target.loc["C", "target_weight"], 0.30)
-        self.assertEqual(
-            target.benchmark_weight.to_dict(), weights
-        )
-        self.assertAlmostEqual(target.target_weight.sum(), 1.0)
-
-    def test_cash_allowed_leaves_cap_excess_as_cash(self):
-        plan, _, _ = self.optimize(
-            OptimizerConfig(
-                method="benchmark_tilt",
-                fully_invested=False,
-                single_name_weight_limit=0.35,
-            ),
-            {"A": 1.0, "B": 2.0, "C": 3.0},
-            held=(),
-            benchmark_weights={"A": 0.6, "B": 0.3, "C": 0.1},
-            benchmark_mode="csi300",
-        )
-        target = plan.weights.set_index("code").target_weight
-        self.assertAlmostEqual(target["A"], 0.35)
-        self.assertAlmostEqual(target["B"], 0.35)
-        self.assertAlmostEqual(target["C"], 0.20)
-        self.assertAlmostEqual(target.sum(), 0.90)
+        self.assertEqual(plan.weights.set_index("code").target_weight.to_dict(),
+                         {"A": 0., "B": .35, "C": .35})
 
     def test_unavailable_benchmark_weights_are_never_replaced_by_equal_weights(self):
         cache, dates = make_cache(
@@ -182,7 +153,7 @@ class PortfolioOptimizerTests(unittest.TestCase):
             benchmark_mode="csi300",
         )
         with self.assertRaisesRegex(ValueError, "benchmark weights are unavailable"):
-            PortfolioOptimizer(OptimizerConfig(method="benchmark_tilt")).optimize(
+            PortfolioOptimizer(OptimizerConfig(method="barra")).optimize(
                 signal_date=dates[1], cache=cache
             )
         self.assertFalse(cache.published)
@@ -229,31 +200,16 @@ class PortfolioOptimizerTests(unittest.TestCase):
         self.assertEqual(target.target_weight.tolist(), [0.0])
 
 
-    def test_benchmark_tilt_all_ties_preserve_historical_benchmark(self):
-        benchmark = {"A": 0.6, "B": 0.3, "C": 0.1}
-        plan, _, _ = self.optimize(
-            OptimizerConfig(method="benchmark_tilt"),
-            {"A": 5.0, "B": 5.0, "C": 5.0},
-            held=(),
-            benchmark_weights=benchmark,
-            benchmark_mode="csi300",
-        )
-        target = plan.weights.set_index("code")
-        for code, weight in benchmark.items():
-            self.assertAlmostEqual(target.loc[code, "target_weight"], weight)
+    def test_only_top_k_and_barra_are_supported_without_submodes(self):
+        for method in ("top_k", "barra"):
+            PortfolioOptimizer(OptimizerConfig(method=method))
+        for method in ("benchmark_tilt", "exposure_only", "provided", "unknown"):
+            with self.subTest(method=method), self.assertRaises(NotImplementedError):
+                PortfolioOptimizer(OptimizerConfig(method=method))
+        for option in ("risk_model", "risk_aversion"):
+            with self.subTest(option=option), self.assertRaises(TypeError):
+                OptimizerConfig(method="barra", **{option: "provided"})
 
-    def test_benchmark_tilt_partial_ties_share_average_percentile(self):
-        plan, _, _ = self.optimize(
-            OptimizerConfig(method="benchmark_tilt"),
-            {"A": 1.0, "B": 3.0, "C": 3.0},
-            held=(),
-            benchmark_weights={"A": 0.6, "B": 0.3, "C": 0.1},
-            benchmark_mode="csi300",
-        )
-        target = plan.weights.set_index("code").target_weight
-        self.assertAlmostEqual(target["A"], 0.375)
-        self.assertAlmostEqual(target["B"], 0.46875)
-        self.assertAlmostEqual(target["C"], 0.15625)
 
 if __name__ == "__main__":
     unittest.main()

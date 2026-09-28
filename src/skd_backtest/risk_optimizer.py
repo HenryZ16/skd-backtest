@@ -1,9 +1,6 @@
-"""Barra factor-risk objective and linear portfolio constraints.
-
-The risk inputs are point-in-time estimates supplied by the data owner:
-asset covariance = exposure @ factor covariance @ exposure.T + specific variance.
-"""
+"""Ranked alpha optimization with Barra exposure and portfolio constraints."""
 import numpy as np
+from scipy.optimize import linprog
 
 
 def _dated(dataset, date, name):
@@ -15,56 +12,35 @@ def _dated(dataset, date, name):
     return frame
 
 
-def _aligned(dataset, date, codes, name, columns):
+def _aligned(dataset, date, codes, name):
     frame = _dated(dataset, date, name)
     if frame.code.duplicated().any():
         raise ValueError(f"{name} contains duplicate stocks")
     indexed = frame.set_index("code")
     if not set(codes).issubset(indexed.index):
         raise ValueError(f"{name} does not cover the legal universe")
-    return indexed.loc[codes, list(columns)]
-
-
-def asset_covariance(*, config, date, codes, inputs):
-    """Align real risk inputs; never synthesize missing factor/specific risks."""
-    factors = list(config.barra_factors)
-    exposures = _aligned(inputs.barra_exposures, date, codes, "Barra exposures", factors).to_numpy(dtype=float)
-    frame = _dated(inputs.factor_covariance, date, "factor covariance")
-    factor_cov = frame.pivot(index="factor1", columns="factor2", values="covariance").reindex(
-        index=factors, columns=factors).to_numpy(dtype=float)
-    specific = _aligned(inputs.specific_risk, date, codes, "specific risk",
-                        ("specific_variance",)).to_numpy(dtype=float).ravel()
-    if not all(np.isfinite(array).all() for array in (exposures, factor_cov, specific)):
-        raise ValueError("Barra exposures and risk parameters must be complete finite numbers")
-    if (specific < 0).any():
-        raise ValueError("specific variances must be nonnegative")
-    if not np.allclose(factor_cov, factor_cov.T, rtol=1e-10, atol=1e-12):
-        raise ValueError("factor covariance must be symmetric")
-    factor_cov = (factor_cov + factor_cov.T) / 2
-    smallest = np.linalg.eigvalsh(factor_cov).min()
-    tolerance = 1e-12 * max(1.0, np.abs(factor_cov).max())
-    if smallest < -tolerance:
-        raise ValueError("factor covariance must be positive semidefinite")
-    if smallest < 0:  # Remove only floating-point roundoff, not invalid risk estimates.
-        factor_cov = factor_cov + np.eye(len(factors)) * -smallest
-    covariance = exposures @ factor_cov @ exposures.T + np.diag(specific)
-    if not np.isfinite(covariance).all():
-        raise ValueError("asset covariance overflow")
-    return covariance, exposures
+    return indexed.loc[codes].drop(columns="date")
 
 
 def optimize_barra(*, config, date, codes, alpha, benchmark, inputs, current_weights):
-    try:
-        from scipy.optimize import linprog, minimize
-    except ImportError as exc:
-        raise ImportError("method=barra requires skd-backtest[optimizer]") from exc
     if not codes:
         raise ValueError("Barra optimization requires a nonempty legal universe")
-    covariance, exposures = asset_covariance(config=config, date=date, codes=codes, inputs=inputs)
+    exposures = _aligned(
+        inputs.barra_exposures, date, codes, "Barra exposures",
+    ).drop(columns="名称", errors="ignore").to_numpy(dtype=float)
+    if exposures.shape[1] == 0:
+        raise ValueError("Barra exposures must contain at least one factor column")
+    if not np.isfinite(exposures).all():
+        raise ValueError("Barra exposures must be complete finite numbers")
     count = len(codes)
     b = np.array([benchmark[code] for code in codes], dtype=float)
     # Centered percentile ranks keep the signal invariant to strictly increasing transforms.
     signal = np.array([alpha[code] - 0.5 for code in codes], dtype=float)
+    if current_weights.code.duplicated().any():
+        raise ValueError("current weights contain duplicate stocks")
+    all_current = current_weights.weight.to_numpy(dtype=float)
+    if not np.isfinite(all_current).all() or (all_current < 0).any():
+        raise ValueError("current cash-equity weights must be finite and nonnegative")
     current_map = dict(zip(current_weights.code, current_weights.weight))
     current = np.array([current_map.get(code, 0.0) for code in codes], dtype=float)
     outside = sum(float(weight) for code, weight in current_map.items() if code not in set(codes))
@@ -108,7 +84,7 @@ def optimize_barra(*, config, date, codes, alpha, benchmark, inputs, current_wei
                 inequality(-row, -center + limit)
 
     if config.industry_exposure_limit is not None:
-        industries = _aligned(inputs.industries, date, codes, "industries", ("industry",))
+        industries = _aligned(inputs.industries, date, codes, "industries")
         labels = industries.industry.tolist()
         if any(not isinstance(label, str) or not label for label in labels):
             raise ValueError("industry labels must be nonempty strings")
@@ -135,54 +111,21 @@ def optimize_barra(*, config, date, codes, alpha, benchmark, inputs, current_wei
 
     matrix = np.array(rows).reshape(-1, size)
     rhs = np.array(limits)
-    # Exact sector/style neutrality can duplicate the budget (or each other).
-    # Keep an independent equality basis so SLSQP does not falsely stop at its seed.
-    basis, values = [], []
-    for row, value in zip(equal_rows, equal_values):
-        if basis:
-            coefficients = np.linalg.lstsq(np.array(basis).T, row, rcond=1e-12)[0]
-            residual = row - coefficients @ np.array(basis)
-            implied = coefficients @ np.array(values)
-        else:
-            residual, implied = row, 0.0
-        if np.linalg.norm(residual) > 1e-10 * max(1.0, np.linalg.norm(row)):
-            basis.append(row)
-            values.append(value)
-        elif abs(value - implied) > 1e-9:
-            raise ValueError("portfolio constraints are infeasible: inconsistent equalities")
-    equality = np.array(basis) if basis else None
-    equal_rhs = np.array(values)
-    feasibility = linprog(
-        np.zeros(size), A_ub=matrix if rows else None, b_ub=rhs if rows else None,
+    equality = np.array(equal_rows) if equal_rows else None
+    equal_rhs = np.array(equal_values)
+    linear_objective = np.zeros(size)
+    linear_objective[:count] = -signal
+    solution = linprog(
+        linear_objective, A_ub=matrix if rows else None, b_ub=rhs if rows else None,
         A_eq=equality, b_eq=equal_rhs if equality is not None else None,
         bounds=list(zip(lower, upper)), method="highs",
+        options={"primal_feasibility_tolerance": 1e-9, "dual_feasibility_tolerance": 1e-9},
     )
-    if not feasibility.success:
-        raise ValueError(f"portfolio constraints are infeasible: {feasibility.message}")
-
-    def objective(z):
-        active = z[:count] - b
-        return 0.5 * config.risk_aversion * (active @ covariance @ active) - signal @ z[:count]
-
-    def gradient(z):
-        result = np.zeros(size)
-        result[:count] = config.risk_aversion * covariance @ (z[:count] - b) - signal
-        return result
-
-    constraints = []
-    if rows:
-        constraints.append({"type": "ineq", "fun": lambda z: rhs - matrix @ z,
-                            "jac": lambda z: -matrix})
-    if equality is not None:
-        constraints.append({"type": "eq", "fun": lambda z: equality @ z - equal_rhs,
-                            "jac": lambda z: equality})
-    solution = minimize(
-        objective, feasibility.x, jac=gradient, method="SLSQP",
-        bounds=list(zip(lower, upper)), constraints=constraints,
-        options={"ftol": 1e-11, "maxiter": 1000},
-    )
-    if not solution.success or not np.isfinite(solution.x).all():
-        raise ValueError(f"Barra optimization failed: {solution.message}")
+    if not solution.success:
+        reason = "portfolio constraints are infeasible" if solution.status == 2 else "Barra optimization failed"
+        raise ValueError(f"{reason}: {solution.message}")
+    if not np.isfinite(solution.x).all():
+        raise ValueError("Barra optimization returned nonfinite weights")
     weights = np.clip(solution.x[:count], 0, 1)
     if weights.sum() > 1:
         weights /= weights.sum()  # Never publish leverage due to solver roundoff.

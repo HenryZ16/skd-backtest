@@ -11,7 +11,8 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from skd_backtest import DataCapabilities, OptimizerConfig, ReferenceSources
+from skd_backtest import OptimizerConfig
+from skd_backtest.config import REFERENCE_DATASETS
 from skd_backtest.data_provider import _price_history
 from skd_backtest.evaluate import main
 from skd_backtest.submission_runner import SubmissionRunner
@@ -36,7 +37,7 @@ class InferenceModel:
         self.bias += OFFSET + MODULE_RANDOM + random.random() + np.random.random()
         self.calls = 0
         self.dates = []
-    def predict(self, as_of_date, data):
+    def predict(self, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
         self.calls += 1
         self.dates.append(as_of_date)
         barra = data["Barra_factor"]
@@ -105,6 +106,17 @@ class SpecRegressionTests(unittest.TestCase):
             SubmissionRunner.from_submission(broken)
         self.assertEqual(before, {name for name in sys.modules if name.startswith("_skd_submission_")})
 
+    def test_data_sources_have_one_public_configuration_entry(self):
+        from skd_backtest.evaluate import load_config
+        for option in ("reference_sources", "data_capabilities"):
+            with self.subTest(option=option):
+                with self.assertRaises(TypeError):
+                    self.engine(**{option: {}})
+                path = self.root / "removed-config.json"
+                path.write_text(json.dumps({"backtest": {}, option: {}}), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "unknown evaluation configuration section"):
+                    load_config(path)
+
     def test_cli_loads_shared_config_and_writes_required_outputs(self):
         directory = self.submission()
         config = {
@@ -140,8 +152,7 @@ class SpecRegressionTests(unittest.TestCase):
 
     def test_suspended_finite_close_never_enters_history_or_seed_in_either_mode(self):
         for mode in ("adjusted_return", "raw_price"):
-            capabilities = DataCapabilities(raw_prices=True, price_limits=True)
-            engine = self.engine(price_mode=mode, data_capabilities=capabilities)
+            engine = self.engine(price_mode=mode)
             provider = engine.data_provider
             column = "close" if mode == "adjusted_return" else "raw_close"
             frame = pd.DataFrame({
@@ -174,11 +185,10 @@ class SpecRegressionTests(unittest.TestCase):
             frame["raw_" + field] = frame[field]
         frame["upper_limit"], frame["lower_limit"] = 1000.0, .01
         frame.to_parquet(path, index=False)
-        def inference(as_of_date, data):
+        def inference(as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
             return pd.DataFrame({"date": as_of_date, "code": ["SH600000", "SZ000001"], "score": [2., 1.]})
         for mode in ("adjusted_return", "raw_price"):
-            engine = self.engine(inference=inference, price_mode=mode,
-                                 data_capabilities=DataCapabilities(raw_prices=True, price_limits=True))
+            engine = self.engine(inference=inference, price_mode=mode)
             engine.run()
             self.assertEqual(engine.tables["equity_curve"].portfolio_value.tolist(),
                              [1000.0, 1100.0, 1100.0, 1100.0])
@@ -186,29 +196,23 @@ class SpecRegressionTests(unittest.TestCase):
     def test_barra_optimizer_runs_through_existing_financial_components(self):
         dates = ["2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05"]
         codes = ["SH600000", "SZ000001"]
-        factor = SOURCE_COLUMNS["Barra_factor"][3]
         tables = {
             "benchmark_returns": pd.DataFrame({"date": dates, "benchmark_return": [0.] * 4}),
             "benchmark_weights": pd.DataFrame([(day, code, .5) for day in dates for code in codes],
                                              columns=["date", "code", "benchmark_weight"]),
             "industries": pd.DataFrame([(day, code, "industry") for day in dates for code in codes],
                                       columns=["date", "code", "industry"]),
-            "factor_covariance": pd.DataFrame([(day, factor, factor, .1) for day in dates],
-                                             columns=["date", "factor1", "factor2", "covariance"]),
-            "specific_risk": pd.DataFrame([(day, code, 1.) for day in dates for code in codes],
-                                         columns=["date", "code", "specific_variance"]),
         }
         sources = {}
         for name, table in tables.items():
-            sources[name] = self.root / (name + ".parquet")
+            sources[name] = self.root / REFERENCE_DATASETS[name] / (name + ".parquet")
+            sources[name].parent.mkdir()
             table.to_parquet(sources[name], index=False)
         engine = self.engine(
             benchmark_mode="csi300",
-            data_capabilities=DataCapabilities(benchmark_returns=True, benchmark_weights=True,
-                industries=True, factor_covariance=True, specific_risk=True),
-            reference_sources=ReferenceSources(**sources),
-            optimizer_config=OptimizerConfig(method="barra", barra_factors=(factor,),
-                risk_aversion=2, active_weight_limit=.2, industry_exposure_limit=0.,
+
+            optimizer_config=OptimizerConfig(method="barra",
+                active_weight_limit=.2, industry_exposure_limit=0.,
                 barra_style_exposure_limit=0., turnover_limit=1.),
         )
         engine.run()
@@ -218,11 +222,13 @@ class SpecRegressionTests(unittest.TestCase):
         self.assertIsNotNone(engine.metrics["total_return"])
         self.assertTrue(engine.tables["equity_curve"].benchmark_nav.eq(1).all())
         self.assertFalse(engine.reference_data._tables)
-        # The same engine reloads point-in-time risk inputs after each run.
-        tables["specific_risk"]["specific_variance"] = 10.
-        tables["specific_risk"].to_parquet(sources["specific_risk"], index=False)
+        # The same engine reloads historical weights after each run.
+        tables["benchmark_weights"]["benchmark_weight"] = [.4, .6] * len(dates)
+        tables["benchmark_weights"].to_parquet(sources["benchmark_weights"], index=False)
         engine.run()
-        self.assertLess(engine.tables["target_weights"].iloc[0].target_weight, .7)
+        np.testing.assert_allclose(engine.tables["target_weights"].target_weight,
+                                   [.6, .4, .2, .8], atol=1e-7)
+
 
 
 if __name__ == "__main__":

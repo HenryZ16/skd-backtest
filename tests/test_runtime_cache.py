@@ -29,8 +29,10 @@ class RuntimeCacheTest(unittest.TestCase):
     dates = ("2018-01-02", "2018-01-03", "2018-01-04")
 
     def setUp(self):
+        def inference(as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
+            return pd.DataFrame(columns=["date", "code", "score"])
         self.engine = BacktestEngine(data_dir=Path("."), start_date=self.dates[0], end_date=self.dates[-1],
-                                     inference=lambda **kw: None, initial_cash=100.0, rebalance_interval=1)
+                                     inference=inference, initial_cash=100.0, rebalance_interval=1)
         self.cache = RuntimeCache(context=RunContext(self.engine.config, self.engine.optimizer_config, self.engine.cost_config))
         self.addCleanup(self.cache.close)
         self.views = {role: self.cache.for_component(role) for role in Role}
@@ -63,7 +65,9 @@ class RuntimeCacheTest(unittest.TestCase):
             self.root.publish(Topic.MARKET_CONTEXT, day, MarketContext(
                 day, universe, universe.assign(date=day, beta=1.0, notes=[{"tags": [1]}, {"tags": [2]}])))
             ReferenceDataProvider(self.engine.config).prepare_signal(date=day, cache=self.views[Role.REFERENCE_DATA])
-            runner = SubmissionRunner(lambda **kw: universe.assign(date=day, score=[1.0, 2.0]))
+            def inference(as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
+                return universe.assign(date=day, score=[1.0, 2.0])
+            runner = SubmissionRunner(inference)
             runner.predict(as_of_date=day, data={}, cache=self.views[Role.RUNNER])
             execution = self.dates[self.dates.index(day) + 1]
             self.views[Role.OPTIMIZER].publish(Topic.SIGNAL_TARGETS, execution,

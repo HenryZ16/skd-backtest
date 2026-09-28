@@ -21,7 +21,6 @@ class PortfolioOptimizer:
         inputs = cache.read(Topic.REFERENCE_PORTFOLIO, signal_date)
         closing = cache.read(Topic.ACCOUNT_CLOSE, signal_date)
         calendar = cache.read(Topic.RUN_CALENDAR).signal_calendar
-        context = cache.read(Topic.RUN_CONTEXT)
 
         signal_rows = calendar.loc[calendar.signal_date == signal_date, "execution_date"]
         if len(signal_rows) != 1:
@@ -32,14 +31,10 @@ class PortfolioOptimizer:
 
         legal_codes = list(inputs.universe.code)
         score_map, ranked_codes = self._ranked_scores(scores)
-        benchmark_map = None
-        if context.backtest.benchmark_mode == "csi300":
-            benchmark_map = self._benchmark_weights(
-                inputs.benchmark_weights, signal_date, legal_codes,
-                required=self.config.method in ("benchmark_tilt", "barra"),
-            )
-        elif self.config.method in ("benchmark_tilt", "barra"):
-            raise ValueError("benchmark-relative optimization requires benchmark_mode=csi300")
+        benchmark_map = self._benchmark_weights(
+            inputs.benchmark_weights, signal_date, legal_codes,
+            required=self.config.method == "barra",
+        )
 
         if self.config.method == "barra":
             from .risk_optimizer import optimize_barra
@@ -49,25 +44,12 @@ class PortfolioOptimizer:
                 alpha=percentiles, benchmark=benchmark_map, inputs=inputs,
                 current_weights=closing.actual_weights,
             )
-        elif self.config.method == "top_k":
+        else:
             selected = ranked_codes[: min(self.config.top_k, len(ranked_codes))]
             candidate = {code: 0.0 for code in legal_codes}
             if selected:
                 weight = 1.0 / len(selected)
                 candidate.update(dict.fromkeys(selected, weight))
-        else:
-            if benchmark_map is None:
-                raise ValueError("benchmark_tilt requires available historical benchmark weights")
-            percentiles = self._percentiles(ranked_codes, score_map)
-            candidate = {
-                code: benchmark_map[code] * (0.5 + percentiles[code])
-                for code in legal_codes
-            }
-            total = sum(candidate.values())
-            if not isfinite(total) or total <= 0:
-                raise ValueError("benchmark tilt has no positive benchmark-weighted candidates")
-            candidate = {code: weight / total for code, weight in candidate.items()}
-
         targets = candidate if self.config.method == "barra" else self._apply_name_limit(candidate)
         if self.config.fully_invested and legal_codes and not isclose(
             sum(targets.values()), 1.0, rel_tol=0.0, abs_tol=1e-10
@@ -110,7 +92,7 @@ class PortfolioOptimizer:
         )
 
     def _validate_config(self) -> None:
-        if self.config.method not in ("top_k", "benchmark_tilt", "barra"):
+        if self.config.method not in ("top_k", "barra"):
             raise NotImplementedError(f"optimizer method is not supported: {self.config.method}")
         if not self.config.long_only:
             raise NotImplementedError("short selling is not supported by the cash-equity execution engine")
@@ -131,15 +113,6 @@ class PortfolioOptimizer:
                     raise ValueError(f"{name} must be finite and nonnegative")
                 if self.config.method != "barra":
                     raise ValueError(f"{name} requires method=barra")
-        if self.config.method == "barra":
-            risk = self.config.risk_aversion
-            if isinstance(risk, bool) or not isinstance(risk, Real) or not isfinite(risk) or risk <= 0:
-                raise ValueError("risk_aversion must be finite and positive")
-            factors = self.config.barra_factors
-            if not factors or len(set(factors)) != len(factors) or any(
-                not isinstance(name, str) or not name for name in factors
-            ):
-                raise ValueError("barra_factors must be unique nonempty names")
         cap = self.config.single_name_weight_limit
         if cap is not None and (
             isinstance(cap, bool) or not isinstance(cap, Real)

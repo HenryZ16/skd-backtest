@@ -50,7 +50,7 @@ import pandas as pd
 from skd_backtest import BacktestEngine, CostConfig, OptimizerConfig
 
 
-def inference(as_of_date, data):
+def inference(as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
     # data 只包含截至当日、最多 lookback 个交易日的研究历史。
     day = int(as_of_date.replace("-", ""))
     codes = data["Barra_factor"].loc[lambda frame: frame["日期"] == day, "代码"]
@@ -93,8 +93,22 @@ engine = BacktestEngine(
 metrics = engine.run()
 ```
 
-句柄必须接受 `as_of_date`、`data` 两个关键字参数，返回 `date/code/score` 三列的
-`pandas.DataFrame`。Runner 会验证当日日期、有限数值分数、代码唯一及完整覆盖当日合法池，
+推理接口如下；平台按 as_of_date 和 data 两个关键字调用：
+
+```python
+def predict(self, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    ...
+```
+
+传入绑定方法 `model.predict` 时不传 self；普通函数省略 self。
+类型要求统一声明在框架内部，由 Typeguard 装饰器自动检查；用户无需继承类、添加装饰器或编写检查代码，用户函数省略类型标注也能使用。
+每次调用前检查 as_of_date 为 str、data 为 dict，且所有键为 str、所有值为 DataFrame；
+模型返回时检查实际结果为 DataFrame，类型不符直接抛出 typeguard.TypeCheckError。
+构造阶段不执行推理或检查用户函数的标注；参数名或调用方式不兼容时，由 Python 在实际调用时抛出 TypeError。
+直接传入 inference 与 submission_dir 加载的模型，以及同步和异步推理，共用同一检查入口。
+使用普通 Python 运行模式；python -O / -OO 会关闭 Typeguard 的装饰器检查。
+首个信号另检查 date/code/score 列结构。
+Runner 会验证当日日期、有限数值分数、代码唯一及完整覆盖当日合法池，
 然后按代码排序并发布缓存。传入回调时，模型实例由调用者创建与管理；平台不执行训练。
 示例使用 naive 模型，为当日 Barra 表中的全部沪深300成分股统一返回零分；
 `top_k=300` 为300只成分股生成各 `1/300` 的等权目标，实际持仓受停牌等交易限制影响。
@@ -146,8 +160,16 @@ method = "top_k"
 top_k = 50
 ~~~
 
-配置段为 backtest、optimizer、costs、data_capabilities、reference_sources；
-字段与对应数据类同名。相对数据和输出路径相对于配置文件目录解析。
+**配置段与参数说明：**
+
+| TOML 配置段 | 参数说明 |
+|---|---|
+| `[backtest]` | [回测区间、数据目录、资金及运行选项](#backtest-config) |
+| `[optimizer]` | [Top-K / Barra 选择与组合约束参数](#optimizer-config) |
+| `[costs]`、`[[costs.fee_schedule]]` | [佣金、滑点和历史费率](#costs-config) |
+
+配置段仅为 backtest、optimizer、costs，字段与对应数据类同名。
+相对数据和输出路径相对于配置文件目录解析。
 统一入口未指定 output_dir 时使用 `result/<提交目录名>`，必定生成审计文件。
 费用表使用 costs.fee_schedule 条目，包含 effective_date、stamp_tax_rate、transfer_fee_rate。
 直接使用 Engine 时仍可 output_dir=None，不写结果文件。
@@ -161,6 +183,9 @@ top_k = 50
 <data_dir>/Factor33_winsor/<YYYY>/<MM>/<YYYYMM>.parquet
 <data_dir>/Barra_factor/<YYYY>/<MM>/<YYYYMM>.parquet
 <data_dir>/MarketData/<YYYY>/<MM>/<YYYYMM>.parquet
+<data_dir>/HS300_weight/<YYYY>/hs300_weight_<YYYY>.csv
+<data_dir>/HS300_industry/<YYYY>/hs300_industry_<YYYY>.csv
+<data_dir>/HS300_return/<YYYY>/hs300_return_<YYYY>.csv  # 启用 csi300 评价时需要
 ```
 
 `data` 是以 `Factor33_winsor`、`Barra_factor`、`MarketData` 为键的字典，
@@ -201,18 +226,19 @@ YYYY-MM-DD 字符串，`code` 保留市场前缀。
 
 真实价格模式在同一月度 MarketData 中额外读取：
 
-| 能力声明 | 必需附加列 |
+| 实际文件字段 | 读取方式 |
 |---|---|
-| `raw_prices=True` | `raw_open/raw_high/raw_low/raw_close` |
-| `adjustment_factors=True` 且没有 raw_prices | `adjustment_factor` |
-| `price_limits=True` | `upper_limit/lower_limit` |
+| `raw_open/raw_high/raw_low/raw_close` 完整存在 | 直接使用真实价格 |
+| 缺少完整原价，但有 `adjustment_factor` 和复权 OHLC | 用复权价格除以因子恢复原价 |
+| `upper_limit/lower_limit` | raw_price 执行所需的历史限价 |
 
 复权因子约定为 `adjusted_price = raw_price * adjustment_factor`，因子必须为有限正值。
-同时提供原价和因子时优先原价。真实开盘/收盘接口分别使用 raw_open/raw_close，
+按每个月文件的实际字段选择来源，同时提供原价和因子时优先原价；没有可用来源时指出文件与缺少的字段。
+真实开盘/收盘接口分别使用 raw_open/raw_close，
 previous_close 和 reference_close 也使用原价体系。研究窗口始终只含原 SOURCE_COLUMNS，
 不会把原价、因子或限价附加列传给模型。股票停牌或当日价格缺失时不成交，持仓继续按最近可用参考价估值。
 
-`label_price_basis` 独立选择 adjusted_open 或 raw_open；后者同样需要原价或因子能力，
+`label_price_basis` 独立选择 adjusted_open 或 raw_open；后者逐文件识别 raw_open 或 open + adjustment_factor，
 但不要求将交易模式切换为 raw_price。
 
 ## 独立数据 API
@@ -250,75 +276,139 @@ selected = engine.data_provider.valuation_inputs(codes=["SZ000001", "SH600000"])
 无交易日区间返回带完整列名的空表。
 此 API 会物化整个区间的结果，内存随日期数和股票数增长；播放 API 的分批缓存限制不适用于返回表。
 
+<a id="backtest-config"></a>
+
 ## 构造配置
 
-必填：`data_dir`、`start_date`、`end_date`，以及 `inference` / `submission_dir` 二选一。
-可选：`initial_cash`、`rebalance_interval`、`holding_period`、`lookback`、
-`price_mode`、`optimizer_config`、`cost_config`、`trading_days_per_year`、
-`risk_free_rate`、`output_dir`、`read_batch_months`（默认 12）、`prefetch`（默认 True）、
-`async_inference`（默认 True）、`friendly_output`（默认 True）、`random_seed`（默认 0），
-以及 `benchmark_mode`（默认 none）、`label_price_basis`（默认 adjusted_open）、
-`data_capabilities` 和 `reference_sources`。
-无风险利率按年化小数配置，费率和权重均用小数。
+### `[backtest]` 回测参数
 
-DataCapabilities 和 ReferenceSources 可从 skd_backtest 导入，分别声明数据能力和外部来源路径。
-配置为冻结数据类；已有默认源支持后复权研究数据、停牌、成分及 Barra。
-启用 csi300 需要基准日收益；基准相对优化和相应约束还需要权重、行业或暴露。
-能力声明不替代真实数据检查。外部参考来源支持 CSV 或 Parquet，按精确日期读取，不前向填充。
+| 参数 | TOML 类型 | 默认值 | 含义与取值要求 |
+|---|---|---|---|
+| `data_dir` | 字符串 | 必填 | 数据根目录，例如 `"D:/Data"`；参考数据也从其固定子目录读取 |
+| `start_date` | 字符串 | 必填 | 回测开始日期，格式 `"YYYY-MM-DD"`，包含当天 |
+| `end_date` | 字符串 | 必填 | 回测结束日期，格式 `"YYYY-MM-DD"`，包含当天；不得早于开始日期 |
+| `initial_cash` | 数值 | `1000000.0` | 初始资金，必须有限且大于 0 |
+| `rebalance_interval` | 整数 | `5` | 调仓信号间隔，单位为交易日，必须为正整数 |
+| `holding_period` | 整数 | `5` | 预测评价标签的持有期，单位为交易日，必须为正整数 |
+| `lookback` | 整数 | `252` | 模型研究窗口长度，单位为交易日，必须为正整数 |
+| `price_mode` | 字符串 | `"adjusted_return"` | `"adjusted_return"` 按复权价格推进持仓价值；`"raw_price"` 按真实价格和股数交易、估值 |
+| `trading_days_per_year` | 整数 | `252` | 绩效年化使用的每年交易日数，必须为正整数 |
+| `risk_free_rate` | 数值 | `0.0` | 年化无风险利率，按小数填写，必须有限且大于 -1 |
+| `output_dir` | 字符串 | 命令行：`result/<提交目录名>`；Python API：不写文件 | 审计结果输出目录；显式填写的相对路径以 TOML 所在目录为基准，命令行默认目录以当前工作目录为基准 |
+| `read_batch_months` | 整数 | `12` | 每批读取的月份数，必须为正整数 |
+| `prefetch` | 布尔值 | `true` | 是否在后台预取下一批数据 |
+| `async_inference` | 布尔值 | `true` | 是否使用后台线程执行模型推理 |
+| `random_seed` | 整数 | `0` | 随机种子，范围为 0 至 4294967295 |
+| `benchmark_mode` | 字符串 | `"none"` | `"none"` 不计算相对指数绩效；`"csi300"` 使用 `HS300_return` 的历史指数收益 |
+| `label_price_basis` | 字符串 | `"adjusted_open"` | 预测标签价格口径，可选 `"adjusted_open"` 或 `"raw_open"` |
+| `friendly_output` | 布尔值 | `true` | 显示进度和结果表；命令行 `--friendly-output` / `--no-friendly-output` 可覆盖此值 |
+
+TOML 模型目录由命令行 `--submission` 指定；优化器和费用分别填写在 `[optimizer]`、`[costs]`。
+直接使用 Python API 时，另传 `inference` / `submission_dir` 二选一，以及可选的 `optimizer_config`、`cost_config`；这四项不写入 `[backtest]`。
+TOML 中省略可选字段即使用默认值，不写 `None` 或 `null`。
+
+数据配置统一为 `data_dir`，不再另设路径或能力声明。平台按实际目录、文件和字段判断可用性。
+启用 csi300 需要 HS300_return；Barra 需要 HS300_weight 和 Barra_factor，行业约束另需 HS300_industry。
+三个参考目录递归读取 CSV / Parquet；既支持标准列名，也支持下述权重和行业的原始中文格式。
+缺少必需目录、文件或字段时明确报错。
+按精确日期读取，不前向填充；benchmark_mode 只控制指数收益评价，不控制优化参考权重的读取。
 完整字段及其关系见[接口协议](interfaces.md)。
 
-`OptimizerConfig.method` 支持 top_k、benchmark_tilt 和 barra。Top-K 按分数降序、代码升序选择，
-股票数不足 K 时使用全部合法股票。benchmark_tilt 以历史基准权重乘
-`0.5 + score_percentile` 后归一化；并列分数使用平均排名，全部同分时保持基准权重。
+<a id="optimizer-config"></a>
 
-三种方法均支持 Fully Invested 和 single_name_weight_limit。
-Fully Invested=True 时无法满仓会报错；False 允许持有剩余现金。
-现货引擎不支持卖空，long_only=False 明确报错。`None` 表示限制未设置。
+### `[optimizer]` 优化器参数
+
+| 参数 | TOML 类型 | 默认值 | 含义与取值要求 |
+|---|---|---|---|
+| `method` | 字符串 | `"top_k"` | 仅支持 `"top_k"` 和 `"barra"` |
+| `top_k` | 整数 | `50` | 仅 Top-K 使用；选择分数最高的 K 只股票并等权分配，必须为正整数；股票不足 K 时使用全部合法股票 |
+| `long_only` | 布尔值 | `true` | 仅做多；当前现货引擎不支持 `false` |
+| `fully_invested` | 布尔值 | `true` | 目标权重合计为 1；`false` 允许剩余现金；要求满仓却不可行时会报错 |
+| `single_name_weight_limit` | 数值 | 未设置 | 两种方法均支持；每只股票目标权重上限，范围为 `(0, 1]`，例如 `0.10` 表示 10% |
+| `active_weight_limit` | 数值 | 未设置 | 仅 Barra；每只股票相对指数权重偏离 `abs(w-b)` 的上限，有限且非负；`0.01` 表示 1 个百分点 |
+| `industry_exposure_limit` | 数值 | 未设置 | 仅 Barra；每个行业主动权重之和的绝对值上限，有限且非负；启用时需要历史行业数据 |
+| `barra_style_exposure_limit` | 数值 | 未设置 | 仅 Barra；源表全部因子各自的主动暴露 `abs(Xᵀ(w-b))` 上限，有限且非负；单位沿用输入因子 |
+| `turnover_limit` | 数值 | 未设置 | 仅 Barra；双边权重换手 `sum(abs(w-current_weights))` 上限，有限且非负，包含调出股票归零的卖出部分，不除以 2 |
+
+“未设置”表示省略该字段；TOML 不写 `None` 或 `null`。四项 Barra 专用上限写 `0` 表示严格零偏离或零换手，Top-K 收到这些限制时会报错。
+Top-K 分数并列时按代码升序选择。Barra 在全部合法股票上优化，不使用 `top_k`。
 股票调出合法池时生成零目标，实际能否卖出由 Broker 判断。
 
-### 正式 Barra 优化器
+### Barra 约束优化器
 
-安装可选依赖 `python -m pip install -e ".[optimizer]"`，选择
-`OptimizerConfig(method="barra", risk_aversion=1.0, ...)`。
-默认十个 barra_factors 沿用 Barra 源表的风格列名，也可指定非空且不重复的因子名元组。
+Barra 所需的 SciPy 随包默认安装，在 `[optimizer]` 中选择 `method = "barra"` 即可。
+统一使用当日风格暴露 X、归一化参考权重 b 和启用行业约束时的历史行业分类，
+在组合约束下最大化 `alphaᵀ w`，没有内部模式开关。完整运行示例为
+[examples/barra_usage.py](../examples/barra_usage.py)。
 
-正式方法使用信号日暴露矩阵 X、因子协方差 F 和个股特异方差 D，计算
-`Σ = X F Xᵀ + diag(D)`。在配置约束下最大化
-`alphaᵀ w - risk_aversion / 2 × (w-b)ᵀ Σ (w-b)`，
-其中 alpha 为平均并列百分位减 0.5，b 为历史基准权重。
-风险数据由数据生产方以当日已知的 PIT 估计提供；平台不伪造协方差、不用事后收益估计当日风险。
-协方差与特异方差必须使用相同的收益周期和单位，risk_aversion 按该单位配置。
+alpha 为全部合法股票分数的平均并列百分位减 0.5，不截取 Top-K。
+本地风格数据为 0–1 截面百分位；风格限制使用该输入单位，例如 0.02 表示主动暴露差不超过 0.02。
+所有输入必须在信号时点已知，不使用之后的收益或快照。
 
-| 约束配置 | 正式方法含义 |
-|---|---|
-| active_weight_limit | 每股 `abs(w-b)` 上限 |
-| industry_exposure_limit | 每行业主动权重和的绝对值上限 |
-| barra_style_exposure_limit | 每个配置因子的主动暴露 `abs(Xᵀ(w-b))` 上限 |
-| turnover_limit | `sum(abs(w-current_weights))` 上限，包含调出股票归零的卖出部分，不乘 1/2 |
-
-高级约束必须搭配 method=barra；简单方法收到这些选项时明确报错。
-约束为非负小数，0 表示精确限制；满仓与换手限制必须共同可行，
+满仓与换手限制必须共同可行，
 例如初始全现金到满仓的双边股票权重换手至少为 1。实际成交受交易限制影响，可偏离优化目标。
 
-需配置 benchmark_mode=csi300，并在 DataCapabilities / ReferenceSources 启用对应能力和路径：
+参考数据放在 `data_dir` 下的固定目录：
 
-| 外部来源 | 每个信号日必需字段 |
+| 目录 | 必需字段 |
 |---|---|
-| benchmark_weights | date、code、benchmark_weight |
-| factor_covariance | date、factor1、factor2、covariance |
-| specific_risk | date、code、specific_variance |
-| industries（启用行业限制时） | date、code、industry |
+| HS300_weight | date、code、benchmark_weight；或下述原始中文格式 |
+| HS300_industry（启用行业限制时） | date、code、industry；或下述原始中文格式 |
+| HS300_return（启用 csi300 评价时） | date、benchmark_return；需要覆盖全部回测交易日 |
 
-另需 benchmark_returns 提供每个回测日的基准收益。外部来源均支持 CSV/Parquet，date 为 YYYY-MM-DD。
-因子协方差需给出配置因子的完整成对矩阵，包括双向项及零项；要求对称、半正定。
-特异方差需覆盖合法股票池且非负，暴露来自当日 Barra 源表。缺少当日来源或不可行约束明确失败。
-求解采用 SciPy 的线性可行性检查和 [SLSQP](https://docs.scipy.org/doc/scipy/reference/optimize.minimize-slsqp.html)，
-结果再验证约束，约束容差为 1e-8。不自动放宽用户约束或回退简单算法。
+benchmark_mode=none 也能进行基准相对优化。若需超额收益、跟踪误差和信息比率，
+另设 benchmark_mode=csi300，并在 HS300_return 中提供每日 `date, benchmark_return` 的独立指数收益。
+优化权重不会被当作真实指数收益。benchmark_mode=none 时这三项指标为 None；启用 csi300 却缺少数据时明确报错。
 
-`CostConfig` 包含佣金率、最低佣金、滑点和按生效日升序排列的 `fee_schedule`。
-每条 `FeeScheduleEntry(effective_date, stamp_tax_rate, transfer_fee_rate)` 描述
-自该日起生效的费率。默认零佣金、零滑点、空费率表表示显式使用零费用配置；
-程序不内置或自动获取历史税率。非空费率表未覆盖某交易日期时会报错。
+风格暴露直接使用当日 `Barra_factor` 中除日期、代码、名称外的全部因子列，无需配置因子名单；数据必须覆盖全部合法股票，且各因子值完整、有限。缺少必需来源或不可行约束明确失败。
+Barra 使用 SciPy [HiGHS 线性规划](https://docs.scipy.org/doc/scipy/reference/optimize.linprog-highs.html)。
+结果再次验证全部约束，容差为 1e-8。不自动放宽约束或回退简单算法。
+线性目标存在多个最优解时由固定代码顺序与求解器确定结果，不保证最接近基准的解。
+
+### 原始权重与历史行业数据
+
+传入 `data_dir="D:/Data"` 即会发现其下的 HS300_weight 和 HS300_industry。
+目录内递归读取 CSV / Parquet，忽略 README 等其他文件；CSV 支持 UTF-8 和 GBK 编码。
+每个目录可以包含一个或多个文件，已有年度目录无需搬动或改名。
+原始权重核心列为 `日期、代码、权重、指数成份日`；行业核心列为 `日期、代码、行业代码`。
+日期使用 YYYYMMDD。`权重来源`、`行业名称`、证券名称等附加列保留在读取表中。
+标准 CSV/Parquet 接口仍使用 `date, code, benchmark_weight` 或 `date, code, industry`，日期为 YYYY-MM-DD。
+
+权重按日期除以当天合计，归一化为 1；目标表保存归一化后的权重。输入名单必须与当日合法池完全一致。
+新调入成分直接使用数据表提供的权重；已调出股票目标为零，执行受限时实际持仓继续保留。
+程序不补零、不剔除错误成分、不估算缺失权重，发现名单不一致时直接报错。
+
+行业约束使用对应日期的行业代码。相同行业代码的名称变化不产生新行业；股票历史行业代码变化则使用当日值。
+所有合法成分必须有行业标签。通用行业文件可包含更大的股票池，读取时选择当日合法成分。
+HS300_industry 存在时自动读取，启用行业约束只需配置
+`OptimizerConfig(method="barra", industry_exposure_limit=...)`。
+[完整示例](../examples/barra_usage.py) 同时启用行业、风格、主动权重和换手约束。
+
+权重必须有限、非负，每日合计有限且大于零。日期/代码重复、整日缺失、未来快照均报错。
+带 snapshot_date 的标准文件同样校验快照日期。来源按精确日期读取，不回填未来数据。
+原始文件不修改；输入数据应满足信号时点的历史可得性。
+
+<a id="costs-config"></a>
+
+### `[costs]` 费用参数
+
+| 参数 | TOML 类型 | 默认值 | 含义与取值要求 |
+|---|---|---|---|
+| `commission_rate` | 数值 | `0.0` | 佣金率，按小数填写，必须有限且非负，买卖双边收取 |
+| `minimum_commission` | 数值 | `0.0` | 每笔成交最低佣金金额，与账户资金同单位，必须有限且非负 |
+| `slippage` | 数值 | `0.0` | 滑点比例，按小数填写，范围为 `[0, 1)`；买入提高成交对价，卖出降低成交对价 |
+| `fee_schedule` | 表数组 | `[]` | 历史印花税、过户费表，使用下面的 `[[costs.fee_schedule]]` 条目；按生效日期严格升序排列 |
+
+#### `[[costs.fee_schedule]]` 历史费率条目
+
+| 参数 | TOML 类型 | 默认值 | 含义与取值要求 |
+|---|---|---|---|
+| `effective_date` | 字符串 | 每条必填 | 生效日期，格式 `"YYYY-MM-DD"`；自当天起适用，直至下一条费率生效；日期不得重复 |
+| `stamp_tax_rate` | 数值 | 每条必填 | 印花税率，按小数填写，必须有限且非负，仅卖出时收取 |
+| `transfer_fee_rate` | 数值 | 每条必填 | 过户费率，按小数填写，必须有限且非负，买卖双边收取 |
+
+省略 `fee_schedule` 或填写 `fee_schedule = []` 表示印花税、过户费均为零。
+程序不内置或自动获取历史税率；非空费率表未覆盖某交易日期时会报错。
 佣金按成交现金对价乘费率与最低佣金的较大者收取，印花税仅卖出，过户费双边收取。
 买入滑点提高现金对价，卖出滑点降低现金对价；transaction_cost 只汇总显式费用，避免重复计算滑点。
 现金不足时缩量并重新报价，只有最终接受的报价计入成交。
@@ -361,7 +451,10 @@ None 表示没有有效样本、比率未定义或未启用基准。示例的模
 接收输出对象的所有权，每次 run 重置运行状态。内部缓存使用只读约定下的共享引用，关闭时不修改导出的对象。
 
 predictions 保留所有信号日分数与独立计算的未来收益；缺价、停牌或数据集尾部不足时，
-future_return 为空，不删除预测记录。RankIC 使用有效配对的平均并列排名计算，不受是否成交影响。
+future_return 为空，不删除预测记录。每个信号日的 RankIC 面向当日合法股票池的全截面，
+使用全部有效 score / future_return 配对的平均并列排名计算；不按 Top-K、目标权重或实际持仓筛选，
+也不受是否成交影响。top_k 只决定组合选股数量，不改变 RankIC 或 RankICIR。
+rankic 表中的 n_stocks 记录该日全截面的有效配对数。
 标签只在事后读取，可越过回测 end_date 取得持有期终点，模型不会收到未来价格。
 
 target_weights 记录目标，orders/trades 记录真实执行结果，positions/equity_curve 记录实际持仓与逐日账户。

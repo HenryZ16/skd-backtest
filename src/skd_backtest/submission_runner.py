@@ -10,6 +10,7 @@ from math import isfinite
 from numbers import Real
 
 import pandas as pd
+from typeguard import CollectionCheckStrategy, typechecked
 
 from .contracts import Topic
 from .runtime_cache import CacheView
@@ -41,8 +42,6 @@ def _random_scope(states):
 
 class SubmissionRunner:
     def __init__(self, inference: Inference, random_seed: int = 0):
-        if not callable(inference):
-            raise TypeError("inference must be callable")
         self.inference = inference
         self.random_seed = random_seed
         self.reset_random_state()
@@ -98,14 +97,15 @@ class SubmissionRunner:
         )
         self.publish_scores(as_of_date=as_of_date, scores=scores, cache=cache)
 
+    @typechecked(collection_check_strategy=CollectionCheckStrategy.ALL_ITEMS)
     def infer(self, *, as_of_date: str, data: dict[str, pd.DataFrame],
               universe: frozenset | set, check_schema: bool) -> pd.DataFrame:
         """Invoke and validate the model without accessing the runtime cache."""
         with _random_scope(self._random_states):
-            scores = self.inference(as_of_date=as_of_date, data=data)
+            scores: pd.DataFrame = self.inference(as_of_date=as_of_date, data=data)
         # Schema is fixed for the run; changing row values still need validation each signal.
         if check_schema:
-            if not isinstance(scores, pd.DataFrame) or not scores.columns.is_unique or not set(SCORE_COLUMNS).issubset(scores.columns):
+            if not scores.columns.is_unique or not set(SCORE_COLUMNS).issubset(scores.columns):
                 raise ValueError("inference must return a DataFrame with date/code/score")
         scores = scores.loc[:, SCORE_COLUMNS]
         if not scores.date.eq(as_of_date).all():

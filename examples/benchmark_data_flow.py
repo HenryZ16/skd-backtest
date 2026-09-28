@@ -100,7 +100,7 @@ def run_once(args, prefetch, scope):
     digest = hashlib.sha256()
     market_digest = hashlib.sha256()
 
-    def inference(*, as_of_date, data):
+    def inference(*, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
         day = int(as_of_date.replace("-", ""))
         for name, table in data.items():
             if table.empty or table["日期"].max() != day or table["日期"].nunique() > args.lookback:

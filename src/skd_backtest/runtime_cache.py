@@ -357,10 +357,6 @@ class RuntimeCache:
             self._dataset("barra", value.barra_exposures, ("date", "code"))
             self._dataset("benchmark_weights", value.benchmark_weights, ("date", "code", "benchmark_weight"))
             self._dataset("industries", value.industries, ("date", "code", "industry"))
-            self._dataset("factor_covariance", value.factor_covariance,
-                          ("date", "factor1", "factor2", "covariance"))
-            self._dataset("specific_risk", value.specific_risk,
-                          ("date", "code", "specific_variance"))
         elif topic == Topic.ACCOUNT_OPEN:
             self._schema("open.values", value.values, VALUE_COLUMNS)
             _number(value.market_value, nonnegative=True)

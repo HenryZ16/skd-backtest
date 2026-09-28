@@ -13,7 +13,7 @@ class InferenceModel:
         # naive 模型没有训练参数，保留标准 model_dir 接口。
         logging.getLogger(__name__).debug("[UserModel.__init__] model_dir=%s", model_dir)
 
-    def predict(self, as_of_date, data):
+    def predict(self, as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
         # naive 模型给当日全部沪深300成分股相同的零分。
         day = int(as_of_date.replace("-", ""))
         codes = data["Barra_factor"].loc[lambda table: table["日期"] == day, "代码"]

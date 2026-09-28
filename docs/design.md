@@ -10,11 +10,12 @@
 分数、目标、费用、标签和结果均通过缓存交换；模型调用接口保持不变。
 缓存只负责协议检查、数据持有及审计归集，不承担金融算法。
 
-金融组件已实现并完成联合测试：Top-K / 简单基准倾斜 / Barra 风险优化、真实交易限制、费用、
+金融组件已实现并完成联合测试：Top-K / Barra 约束优化、真实交易限制、费用、
 开盘与收盘估值、外部参考数据、未来收益标签、RankIC、15 项原始指标及 JSON/CSV 输出。
 后复权模式以资产金额记账，真实价格模式以股数和真实价格记账；两种模式共享组件接口。
-正式 Barra 方法消费当日暴露、因子协方差与特异方差，支持行业/风格/主动权重/换手约束；
-参数缺失或约束不可行明确失败。现货账户不支持卖空，long_only=False 明确拒绝。
+优化器只提供 Top-K 和 Barra 两种选择。Barra 使用已有暴露、参考权重和历史行业，统一执行
+行业/风格/主动权重/换手约束下的排名分数优化；缺少必需输入或约束不可行时明确失败。
+优化参考权重和指数收益评价独立，benchmark_mode=none 仍可优化。现货账户不支持卖空，long_only=False 明确拒绝。
 独立 `DataProvider.playback()` 同样可用，不需要调整基本示例的调用方式。
 
 ## 市场数据流
@@ -40,7 +41,8 @@ Factor33 和研究行情按每个历史日期的 Barra 成分过滤；
 股票调入前不提供其非成分期历史，调出前的合法历史仍可出现在窗口中。
 缓存可包含预取的未来日期，但传出的研究数据不包含未来行。
 调用模型前先独立保存合法股票池：异步路径取当日市场包的 Barra 成分，同步路径取缓存中的相同成分。
-Runner 验证结果必须完整覆盖该池且分数有限；
+Runner 在统一推理入口使用 Typeguard 装饰器，按 str、dict[str, DataFrame]、DataFrame 声明自动检查实际输入和模型结果；字典逐项检查。
+用户无需继承类、添加装饰器或提供类型标注，构造时不执行推理；结果必须完整覆盖该池且分数有限；
 模型修改其研究副本不能改变合法池或污染市场缓存。
 
 DailyData 包含开盘行情、收盘行情、可选研究窗口与当日 Barra 输入；
@@ -48,9 +50,11 @@ DailyData 包含开盘行情、收盘行情、可选研究窗口与当日 Barra 
 独立 `valuation_inputs()` 用自己的读数状态提供区间行情，不计算收益、不干扰播放。
 
 真实价格模式支持月文件中的 raw OHLC 或 adjustment_factor（adjusted = raw × factor），
-并要求提供当日 upper_limit/lower_limit；缺失能力或关键数据明确失败。
+并要求提供当日 upper_limit/lower_limit；缺失必需字段或关键数据明确失败。
 研究输入仍只保留原 SOURCE_COLUMNS，新增执行字段不进入模型。
-Accounting 只为持仓股票转换估值记录，空持仓直接发布零市值快照，避免每天处理不需要的全市场对象。
+Accounting 按持仓代码对齐行情，以 NumPy 数组批量计算价格、市值和权重，不再将逐股行情和持仓反复转换为字典。
+停牌、缺价及历史参考价也通过 mask 选择，保持价格有效性、日期先后及同日优先级；收盘快照复用估值数组。
+空持仓直接发布零市值快照；总市值保持原持仓顺序累计，输入快照不被修改。
 
 Label Provider 不使用 DataProvider 实例：事后独立按需读取全市场日期和标签端点价格，
 允许越过回测结束日取得持有期终点。停牌、缺价和数据集尾部不足均保留空标签及原因，不回填历史参考价。
@@ -89,7 +93,7 @@ Python 线程不能强制中断用户回调；不自动重试、不静默切换�
 
 Engine 按真实交易日推进：
 
-1. INITIALIZE：打开运行日志，校验数据能力，准备日历，发布信号日与下一执行日。
+1. INITIALIZE：打开运行日志，检查必需参考目录，准备日历，发布信号日与下一执行日。
 2. SETTLEMENT：Broker 直接读取上一收盘账户（首日为初始账户），执行到期持仓解锁。
 3. OPEN_VALUE：Accounting 使用开盘行情发布交易前账户估值。
 4. EXECUTION：Broker 消费当天排期目标；逐笔计费请求由 Engine 交给 Cost Model，
@@ -116,9 +120,12 @@ Broker 不持有 Cost Model，Engine 不解释费用或修改账户。
 ## 失败与输出
 
 未发布、合法空表、`Dataset(status="unavailable", ...)` 分别表达尚无结果、
-已完成且为空、数据源不可用，不可混用。声明的数据能力缺少必要来源或约束输入时明确失败。
-Reference Data 懒读基准收益、权重、行业、因子协方差和特异方差 CSV/Parquet，首次加载验证固定结构、键和值，
-按精确日期选择截面并对齐合法池；来源缺失不生成替代数据。
+已完成且为空、数据源不可用，不可混用。数据根目录缺少必要来源或约束输入时明确失败。
+Reference Data 从 data_dir/HS300_return、HS300_weight、HS300_industry 懒读 CSV/Parquet，
+首次加载验证固定结构、键和值；没有单独的来源路径或能力声明。
+权重和行业支持原始 HS300_weight / HS300_industry 年度 GBK CSV 目录。
+权重按日归一化，名单必须完整且恰好覆盖当日合法池；行业使用对应日期的行业代码，显示名称保留为附加字段。
+原始文件不变；成分错位、缺少必需日期或字段、快照日晚于记录日直接报错。
 源表和日期索引只保留本次运行，Engine 在成功和失败时调用 close，重复运行重新读取文件。
 
 Writer 已实现本次运行独占的 run.log、配置记录、增量刷盘和关闭；
@@ -148,10 +155,10 @@ Engine 使用 console.py 展示默认启用的交易日进度和结果表；展�
 | contracts.py、runtime_cache.py、config.py、schemas.py、engine.py、inference_pipeline.py、console.py、__init__.py | 公共类型、缓存、配置、接线及控制台展示已落地 |
 | data_provider.py | 后复权与真实市场播放、复权因子恢复、历史参考价和限价适配 |
 | submission_runner.py | 标准提交加载、每次评测的模型及随机状态、推理校验；缓存发布仅在主线程执行 |
-| reference_data.py | 精确日期的外部基准、权重、行业及风险参数读取；合法池对齐 |
+| reference_data.py | 精确日期的外部基准、权重和行业读取；合法池对齐 |
 | label_provider.py | 独立按交易日读取端点价格，计算标签并保留缺失原因 |
 | prediction_evaluator.py | 保留全部分数、按键对齐标签、平均并列排名的逐日 RankIC |
-| portfolio_optimizer.py、risk_optimizer.py | Top-K、benchmark tilt、Barra 风险优化、排名信号与全部配置约束；统一输出 TargetPlan |
+| portfolio_optimizer.py、risk_optimizer.py | Top-K、Barra 约束优化、排名信号与全部配置约束；统一输出 TargetPlan |
 | broker.py | 日初结算、T+1、整手/零股、单边限价、现金缩量及计费交换 |
 | cost_model.py | 日期生效费率、最低佣金、卖出印花税、过户费和方向滑点 |
 | accounting.py | 开盘/收盘估值、逐日净值与收益及实际权重已实现并通过独立测试 |
@@ -164,11 +171,11 @@ Engine 使用 console.py 展示默认启用的交易日进度和结果表；展�
 
 ## 验证与打包
 
-核心依赖 pandas、pyarrow 和标准库；正式优化方法额外使用可选 SciPy，不增加缓存服务或调度框架。
+核心依赖 pandas、pyarrow、typeguard 和标准库；正式优化方法额外使用可选 SciPy，不增加缓存服务或调度框架。
 完整测试包含 benchmark 内存采样，需安装可选依赖：
 
 ```powershell
-python -m pip install -e ".[benchmark,optimizer]"
+python -m pip install -e ".[benchmark]"
 python -m unittest discover -s tests -v
 uv build
 ```
@@ -201,7 +208,7 @@ Engine 直接使用真实组件验证完整运行、同步/异步、重复运行
 组件专项测试覆盖交易限制、最低费用边界、两种价格体系、外部源缺失、标签对齐和指标公式。
 真实组件联调用手算价格复核目标→成交→现金→持仓→NAV→标签→指标→输出，
 验证含费用/滑点的现金资产一致性、真实股数/T+1、四种读取/推理组合结果相同，以及修改外部来源后重复运行。
-验收测试覆盖正式优化的手算风险矩阵、各约束、精确中性、退池换手、不可行问题及替换优化器后的金融链。
+验收测试覆盖 Barra 约束优化的手算最优权重、各约束、精确中性、退池换手、不可行问题及替换优化器后的金融链。
 标准提交测试覆盖多模型文件、初始化次数、相对导入隔离、重复运行和同步/异步随机模型一致性。
 控制台测试覆盖默认/关闭输出、金融结果和审计文件一致、进度限频、空区间与重复运行、失败收尾及命令行覆盖配置。
 早期组件性能口径见[组件初验基线](../benchmarks/component_acceptance/REPORT.md)。
