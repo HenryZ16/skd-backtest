@@ -6,12 +6,12 @@
 
 ## 安装与运行
 
-需要 Python 3.11 及以上。`0.1.0-beta.2` 提供可直接安装的 wheel，Python 包版本为 `0.1.0b2`：
+需要 Python 3.11 及以上。`1.0.0rc1` 提供可直接安装的 wheel，Python 包版本为 `1.0.0rc1`：
 
 使用 pip：
 
 ```powershell
-python -m pip install "https://github.com/HenryZ16/skd-backtest/releases/download/v0.1.0-beta.2/skd_backtest-0.1.0b2-py3-none-any.whl"
+python -m pip install "https://github.com/HenryZ16/skd-backtest/releases/download/v1.0.0rc1/skd_backtest-1.0.0rc1-py3-none-any.whl"
 skd-backtest-evaluate --help
 ```
 
@@ -19,7 +19,7 @@ skd-backtest-evaluate --help
 
 ```powershell
 uv venv --python 3.13 .venv
-uv pip install --python .venv "https://github.com/HenryZ16/skd-backtest/releases/download/v0.1.0-beta.2/skd_backtest-0.1.0b2-py3-none-any.whl"
+uv pip install --python .venv "https://github.com/HenryZ16/skd-backtest/releases/download/v1.0.0rc1/skd_backtest-1.0.0rc1-py3-none-any.whl"
 .\.venv\Scripts\skd-backtest-evaluate.exe --help
 ```
 
@@ -29,7 +29,7 @@ uv pip install --python .venv "https://github.com/HenryZ16/skd-backtest/releases
 
 **命令行评测（评测平台批量回测）**：`skd-backtest-evaluate` 是本包提供的命令行评测入口，推荐用于评测平台批量回测时使用。每次调用通过 `--submission` 指定一个标准模型提交目录、通过 `--config` 指定 JSON/TOML 配置，由平台调度多个调用。该命令由 `pyproject.toml` 的 `[project.scripts]` 声明，安装时自动生成，实际调用 `skd_backtest.evaluate.main()`，无需另装工具。在安装包的同一 Python 环境中，`python -m skd_backtest.evaluate` 提供相同入口。`-h`、`-help` 和 `--help` 均展示这两种独立使用方式的说明和完整 `basic_usage.py` 示例代码。
 
-附件和版本说明见 [GitHub Release](https://github.com/HenryZ16/skd-backtest/releases/tag/v0.1.0-beta.2)。数据集需单独准备。
+附件和版本说明见 [GitHub Release](https://github.com/HenryZ16/skd-backtest/releases/tag/v1.0.0rc1)。数据集需单独准备。
 若要开发或运行仓库中的示例，在项目根目录执行：
 
 ```powershell
