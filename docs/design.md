@@ -197,12 +197,12 @@ GitHub Release 标题只使用版本号；每次发布必须上传可由 pip 直
 并在发布说明中同时提供 pip 和 uv 安装命令。发布前在独立环境验证包版本、导入、命令行入口和基本回测，
 发布后核对附件、标签提交及预发布状态。
 
-当前版本为 `1.0.0rc1`，项目元数据、wheel 和源码分发包均使用相同的 PEP 440 版本号。
-GitHub Release 标题为 `1.0.0rc1`，标签为 `v1.0.0rc1`，设为 Latest 以便仓库首页展示。
-GitHub 的 Pre-release 标记关闭，版本号仍明确其候选版本性质。
+当前版本为 `1.0.1`，项目元数据、wheel 和源码分发包均使用相同的 PEP 440 版本号。
+GitHub Release 标题为 `1.0.1`，标签为 `v1.0.1`，发布时设为 Latest 以便仓库首页展示。
+这是正式版本，GitHub 的 Pre-release 标记关闭。
 发布包必须包含 Apache-2.0 许可证：wheel 的许可证目录和源码分发包的 LICENSE 均需核对。
 构建内容须与发布标签提交一致，已有标签不移动。
-本版更新与安装命令见[发布说明](releases/1.0.0rc1.md)。
+本版更新与安装命令见[发布说明](releases/1.0.1.md)。
 
 **Python API（个人单模型回测）**：用户对自己的单个模型进行回测时，建议参考 `examples/basic_usage.py` 使用 Python API。
 
