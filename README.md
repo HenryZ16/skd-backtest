@@ -17,7 +17,10 @@
 
 ## 快速开始
 
-需要 Python 3.11 及以上。发行包的 pip 和 uv 安装方式见[使用说明](docs/usage.md)。安装后有两种独立的使用方式：
+需要 Python 3.11 及以上。发行包的 pip 和 uv 安装方式见[使用说明](docs/usage.md)。
+安装后可通过 `skd_backtest.__version__` 或 `skd-backtest-evaluate --version` 查询版本。
+
+有两种独立的使用方式：
 
 **Python API（个人单模型回测）**：用户对自己的单个模型进行回测时，建议参考 [examples/basic_usage.py](examples/basic_usage.py) 使用 Python API，将已初始化模型的 `model.predict` 作为 `inference` 传给 `BacktestEngine`。
 

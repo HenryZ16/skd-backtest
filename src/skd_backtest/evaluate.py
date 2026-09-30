@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import tomllib
 
+from . import __version__
 from .config import CostConfig, FeeScheduleEntry, OptimizerConfig
 from .engine import BacktestEngine
 
@@ -94,6 +95,8 @@ def main(argv=None):
     )
     parser.add_argument("-h", "-help", "--help", action="help",
                         help="显示使用说明和完整单模型回测示例后退出")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}",
+                        help="显示已安装的 skd-backtest 版本后退出")
     parser.add_argument("--submission", type=Path, required=True, help="含 inference.py 和 model/ 的标准提交目录")
     parser.add_argument("--config", type=Path, required=True, help="统一评测使用的 JSON 或 TOML 配置")
     parser.add_argument("--friendly-output", action=argparse.BooleanOptionalAction, default=None,

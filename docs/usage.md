@@ -6,12 +6,13 @@
 
 ## 安装与运行
 
-需要 Python 3.11 及以上。`1.0.0rc1` 提供可直接安装的 wheel，Python 包版本为 `1.0.0rc1`：
+需要 Python 3.11 及以上。当前源码版本为 `1.0.0`，对应 wheel 的安装命令如下。
+GitHub 下载链接在对应 Release 发布后生效；源码安装方式见下文。
 
 使用 pip：
 
 ```powershell
-python -m pip install "https://github.com/HenryZ16/skd-backtest/releases/download/v1.0.0rc1/skd_backtest-1.0.0rc1-py3-none-any.whl"
+python -m pip install "https://github.com/HenryZ16/skd-backtest/releases/download/v1.0.0/skd_backtest-1.0.0-py3-none-any.whl"
 skd-backtest-evaluate --help
 ```
 
@@ -19,7 +20,7 @@ skd-backtest-evaluate --help
 
 ```powershell
 uv venv --python 3.13 .venv
-uv pip install --python .venv "https://github.com/HenryZ16/skd-backtest/releases/download/v1.0.0rc1/skd_backtest-1.0.0rc1-py3-none-any.whl"
+uv pip install --python .venv "https://github.com/HenryZ16/skd-backtest/releases/download/v1.0.0/skd_backtest-1.0.0-py3-none-any.whl"
 .\.venv\Scripts\skd-backtest-evaluate.exe --help
 ```
 
@@ -29,7 +30,7 @@ uv pip install --python .venv "https://github.com/HenryZ16/skd-backtest/releases
 
 **命令行评测（评测平台批量回测）**：`skd-backtest-evaluate` 是本包提供的命令行评测入口，推荐用于评测平台批量回测时使用。每次调用通过 `--submission` 指定一个标准模型提交目录、通过 `--config` 指定 JSON/TOML 配置，由平台调度多个调用。该命令由 `pyproject.toml` 的 `[project.scripts]` 声明，安装时自动生成，实际调用 `skd_backtest.evaluate.main()`，无需另装工具。在安装包的同一 Python 环境中，`python -m skd_backtest.evaluate` 提供相同入口。`-h`、`-help` 和 `--help` 均展示这两种独立使用方式的说明和完整 `basic_usage.py` 示例代码。
 
-附件和版本说明见 [GitHub Release](https://github.com/HenryZ16/skd-backtest/releases/tag/v1.0.0rc1)。数据集需单独准备。
+附件和版本说明见 [GitHub Release](https://github.com/HenryZ16/skd-backtest/releases/tag/v1.0.0)。数据集需单独准备。
 若要开发或运行仓库中的示例，在项目根目录执行：
 
 ```powershell
@@ -119,6 +120,26 @@ Runner 会验证当日日期、有限数值分数、代码唯一及完整覆盖�
 最多提前缓冲一个调仓间隔的日包，研究窗口按引用交给任务，不新增深拷贝。
 `async_inference=False` 恢复同步推理，`prefetch=False` 只关闭行情读取预取；两者独立。
 用户回调必须正常返回或抛出异常才能结束正在运行的线程。无需修改 model.predict 签名或 basic_usage 调用方式。
+
+## 查询版本
+
+Python API 从已安装发行包的元数据读取版本，与 wheel 的版本保持一致：
+
+```python
+import skd_backtest
+
+print(skd_backtest.__version__)  # 1.0.0
+```
+
+命令行不需要提供提交目录、配置或市场数据：
+
+```powershell
+skd-backtest-evaluate --version
+# skd-backtest-evaluate 1.0.0
+python -m skd_backtest.evaluate --version
+```
+
+从源码开发时先执行 `python -m pip install -e .`；修改项目版本后需重新安装以更新包元数据。
 
 ## 标准参赛提交与可复现性
 
