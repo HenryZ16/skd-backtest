@@ -205,6 +205,7 @@ INITIALIZE
 配置字段集中定义在 `config.py`。数据只有 data_dir 一个配置入口，文件布局见使用说明。
 参考数据固定对应 HS300_index、HS300_weight、HS300_industry；市场与标签读取按每个文件的实际字段选择价格来源。
 具体文件读取方法不属于组件间协议；生产者必须输出第 7 节的标准结构。
+后复权开盘行情强制通过 MarketDataRawOpen 和 Factor33_winsor.is_st 推算常规涨跌停价；没有配置开关。
 
 运行时按所选功能检查实际目录、文件和必需字段。真实价格模式需要真实 OHLC 或可恢复真实价格的复权因子、停牌状态和 PIT 限价；相关数据不能由后复权价格或固定涨跌停比例假造。未准备齐全时保持当前明确拒绝 raw_price 的行为。
 
@@ -270,7 +271,12 @@ Accounting 按持仓代码对齐行情，通过数组 mask 排除停牌、缺价
 
 Reference Data 从 `market.context` 读取成分和 Barra，并结合自己加载的外部权重、行业等数据形成 `reference.portfolio`。调用参赛代码前保存独立的合法股票代码集合。异步路径直接从对应 DailyData.portfolio 的 Barra 截面取得，同步路径从 reference.portfolio 取得；两者来自同一市场截面。验证不能依赖模型调用后可能已被改写的研究窗口。
 
-市场流本身仍可独立播放，不需要 RuntimeCache，不调用金融组件。真实开盘行情的目标字段为 `date, code, raw_open, upper_limit, lower_limit, is_suspended, is_missing, previous_close, previous_close_date`；真实收盘接口用 raw_close 及同价格体系的有效性和历史参考价字段。开盘接口不携带当日 high/low/close/volume/amount。复权模式保持现有 adjusted_open/adjusted_close 的命名。
+市场流本身仍可独立播放，不需要 RuntimeCache，不调用金融组件。真实开盘行情的目标字段为 `date, code, raw_open, upper_limit, lower_limit, is_suspended, is_missing, previous_close, previous_close_date`；真实收盘接口用 raw_close 及同价格体系的有效性和历史参考价字段。开盘接口不携带当日 high/low/close/volume/amount。复权模式保持现有 adjusted_open/adjusted_close 的命名，其 open_market 同样包含 upper_limit/lower_limit，值为后复权口径。
+
+后复权模式的限价计算只使用当日 adjusted_open、独立 raw open、PIT is_st、代码/日期和历史 previous_close。
+先恢复原价参考价，再按历史常规涨跌幅以十进制四舍五入计算原价限价，最后乘回当天比例；详见使用说明。
+缺少历史参考价时限价为空，Broker 必须拒绝需要成交的订单；缺少必需列或辅助数据文件则明确失败。
+原始 open、换算比例和辅助读取均不进入模型研究窗口，真实价格路径与标签读取不使用这份独立 raw open 数据。
 
 ### 7.2 PortfolioInputs
 
@@ -482,7 +488,7 @@ Label Provider 独立读取价格和真实交易日历，可读取回测 end_dat
 
 完整数据集尾部不足、任一端价格缺失或无效、任一端停牌时，future_return 为空并保留 missing_reason，不沿用参考价格制造可成交标签。预测记录不删除。
 
-Evaluator 按 date/code 对齐；每个信号日 n_stocks 为具有有效分数和标签的配对数量，不足两只或排序方差为零时 rankic 为空。标签不受目标权重、订单成败或持仓影响。
+Evaluator 按 date/code 对齐；每个信号日 n_stocks 为具有有效分数和标签的配对数量。不足两只时 rankic 为空；至少两只有效配对且 score 全部相等时 rankic=0，包括标签也全部相等的情况。score 有差异但标签全部相等时 rankic 为空。其余情况按平均并列排名计算 Spearman 相关系数。标签不受目标权重、订单成败或持仓影响。
 
 ### 11.2 七张审计表
 
@@ -519,7 +525,7 @@ Evaluator 按 date/code 对齐；每个信号日 n_stocks 为具有有效分数�
 
 order_id 在单次运行唯一并可确定复现。requested_value、filled_value 和 position_value 均按执行日开盘估值基准计量；原有 trade_value 为含滑点的成交现金对价。真实模式 shares/price 保留真实含义；后复权模式 requested_shares、filled_shares、shares、sellable_shares 和成交 price 为空，不伪造股数、整手或真实成交价。
 
-orders.status 固定为 FILLED、PARTIALLY_FILLED 或 REJECTED；完整成交 reject_reason 为空，部分成交记录缩量/限制原因。reject_reason 至少支持 LIMIT_UP、LIMIT_DOWN、SUSPENDED、INSUFFICIENT_CASH、T1_NOT_SELLABLE；具体不可成交判断由 Broker 负责。
+orders.status 固定为 FILLED、PARTIALLY_FILLED 或 REJECTED；完整成交 reject_reason 为空，部分成交记录缩量/限制原因。reject_reason 至少支持 LIMIT_UP、LIMIT_DOWN、MISSING_PRICE_LIMIT、SUSPENDED、INSUFFICIENT_CASH、T1_NOT_SELLABLE；具体不可成交判断由 Broker 负责。
 
 同一订单多次报价只产生一个最终 orders 行；实际成交才产生 trades 行。只有目标差额确实需要交易时才产生订单。权重优化直接完成的约束裁剪不冒充失败订单。
 
@@ -533,10 +539,10 @@ CloseSnapshot 每交易日必须有一行 equity_curve；positions 按实际非�
 - transaction_cost 为实际成交显式费用 total_cost 之和；滑点已反映在现金和收益中，不能再次相加。
 - 最终 turnover 为每日 turnover 之和；transaction_cost 为每日实际费用之和；failed_orders 仅计 REJECTED 行，部分成交由订单表审计。
 - 15 个指标名称沿用现有 METRIC_NAMES；标准差采用样本标准差 ddof=1，年化使用 trading_days_per_year；无风险利率是年化小数。
-- RankICIR 不年化；RankIC 汇总只使用有效 RankIC 日，正值比例的分母也为有效日数。
+- RankICIR 不年化；RankIC 汇总只使用有效 RankIC 日，正值比例的分母也为有效日数。score 全部相等产生的零值计入有效日数和均值，但不计入正值日数。
 - Total Return 从初始 NAV=1 到期末计算；最大回撤的历史序列包含初始 NAV=1，不能漏掉第一日亏损。
 - 设 n 为回测交易日数（包括未成交日），Y 为 trading_days_per_year；Annualized Return 为期末 NAV^(Y/n)-1，Annualized Excess Return 为组合年化收益减基准年化收益。
-- Annualized Volatility 为日收益样本标准差 × sqrt(Y)；TE 为 active_return 样本标准差 × sqrt(Y)，IR 为 active_return 均值 / 样本标准差 × sqrt(Y)。
+- Annualized Volatility 为日收益样本标准差 × sqrt(Y)；TE 为 active_return 样本标准差 × sqrt(Y)，IR 为 Annualized Excess Return / TE；分子无效、TE 无效或为零时 IR 为 None。
 - Sharpe 使用按 (1+risk_free_rate)^(1/Y)-1 换算的日无风险收益，日超额收益均值 / 日收益样本标准差 × sqrt(Y)。有效样本的波动率可以为 0，作为比率分母的零或浮点近零标准差则使比率未定义。
 - 无足够样本或零方差使指标未定义时返回 None。无交易日区间的收益、风险、RankIC 指标为 None，交易次数/换手/费用合计为 0。
 - Metrics 不读取原始价格、不修改核算结果，不内置最终排行榜权重。

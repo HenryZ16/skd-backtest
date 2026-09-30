@@ -2,13 +2,15 @@
 
 from contextlib import redirect_stdout
 from io import StringIO
-from statistics import mean, stdev
+from statistics import stdev
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import json
 import unittest
 
 import pandas as pd
+
+from market_fixtures import write_raw_open
 
 from skd_backtest import BacktestEngine, CostConfig, FeeScheduleEntry, OptimizerConfig
 from skd_backtest.schemas import METRIC_NAMES, RESULT_COLUMNS, SOURCE_COLUMNS
@@ -31,6 +33,8 @@ class FinancialIntegrationTest(unittest.TestCase):
                     opening, close = values[i]
                     row = dict.fromkeys(columns, 1.0)
                     row.update({"日期": day, "代码": code, "名称": code})
+                    if name == "Factor33_winsor":
+                        row["is_st"] = 0
                     if name == "MarketData":
                         row.update(open=opening, close=close, high=max(opening, close),
                                    low=min(opening, close), is_suspend=False)
@@ -38,6 +42,7 @@ class FinancialIntegrationTest(unittest.TestCase):
             folder = self.root / name / "2018" / "01"
             folder.mkdir(parents=True)
             pd.DataFrame(rows).to_parquet(folder / "201801.parquet", index=False)
+        write_raw_open(self.root)
         self.model_dates = []
         benchmark = self.root / "HS300_index" / "benchmark.csv"
         benchmark.parent.mkdir()
@@ -77,6 +82,7 @@ class FinancialIntegrationTest(unittest.TestCase):
                 if name == "MarketData":
                     frame.loc[(frame["日期"] == 20180105) & frame["代码"].eq("SH600000"), "is_suspend"] = True
             frame.to_parquet(path, index=False)
+        write_raw_open(self.root)
         source = self.root / "HS300_weight" / "2018"
         source.mkdir(parents=True)
         pd.DataFrame([
@@ -180,6 +186,91 @@ class FinancialIntegrationTest(unittest.TestCase):
             self.assertEqual(exported.columns.tolist(), list(columns))
             self.assertEqual(len(exported), len(engine.tables[name]))
 
+    def test_adjusted_run_enforces_limits_across_a_factor_change_and_failed_sale(self):
+        path = self.root / "MarketData/2018/01/201801.parquet"
+        market = pd.read_parquet(path).astype({column: float for column in ("open", "high", "low", "close")})
+        for day, price in ((20180102, 20.0), (20180103, 22.0), (20180104, 22.0), (20180105, 19.8)):
+            mask = market["日期"].eq(day) & market["代码"].eq("SH600000")
+            market.loc[mask, ["open", "high", "low", "close"]] = price
+        market.to_parquet(path, index=False)
+        raw = market[["日期", "代码", "open"]].copy()
+        raw["open"] /= raw["日期"].map(lambda day: 2.0 if day == 20180102 else 4.0)
+        raw.iloc[::-1].to_parquet(self.root / "MarketDataRawOpen/2018/01/201801.parquet", index=False)
+
+        def inference(*, as_of_date, data):
+            self.assertEqual(set(data), set(SOURCE_COLUMNS))
+            self.assertNotIn("upper_limit", data["MarketData"])
+            return pd.DataFrame({"date": as_of_date, "code": ["SH600000", "SZ000001"],
+                                 "score": [2., 1.] if as_of_date < "2018-01-04" else [1., 2.]})
+
+        baseline = None
+        for prefetch, asynchronous in ((False, False), (True, True)):
+            engine = self.engine(inference=inference, rebalance_interval=1, prefetch=prefetch,
+                                 async_inference=asynchronous, read_batch_months=1, friendly_output=False)
+            engine.run()
+            orders = engine.tables["orders"]
+            self.assertEqual(orders.reject_reason.iloc[0], "LIMIT_UP")
+            sale = orders.loc[orders.side.eq("SELL")].iloc[0]
+            self.assertEqual(sale.reject_reason, "LIMIT_DOWN")
+            trades = engine.tables["trades"]
+            self.assertEqual(trades.code.tolist(), ["SH600000"])
+            self.assertEqual(trades.date.tolist(), ["2018-01-04"])
+            self.assertEqual(engine.tables["equity_curve"].portfolio_value.tolist(), [1000., 1000., 1000., 900.])
+            self.assertGreaterEqual(engine.account["cash"], 0.0)
+            self.assertEqual(engine.account["position_values"], {"SH600000": 900.0})
+            self.assertTrue(trades.shares.isna().all())
+            self.assertTrue(trades.price.isna().all())
+            if baseline is not None:
+                for name in engine.tables:
+                    pd.testing.assert_frame_equal(engine.tables[name], baseline.tables[name])
+            baseline = engine
+
+    def test_adjusted_run_allows_buy_at_limit_down_and_sell_at_limit_up(self):
+        path = self.root / "MarketData/2018/01/201801.parquet"
+        market = pd.read_parquet(path).astype({column: float for column in ("open", "high", "low", "close")})
+        for day, price in ((20180102, 20.0), (20180103, 18.0), (20180104, 19.8)):
+            mask = market["日期"].eq(day) & market["代码"].eq("SH600000")
+            market.loc[mask, ["open", "high", "low", "close"]] = price
+        market.to_parquet(path, index=False)
+        write_raw_open(self.root)
+        engine = self.engine(end_date="2018-01-04", rebalance_interval=1, friendly_output=False)
+        engine.run()
+        trades = engine.tables["trades"]
+        self.assertEqual(list(zip(trades.date, trades.side, trades.code)), [
+            ("2018-01-03", "BUY", "SH600000"), ("2018-01-04", "SELL", "SH600000"),
+            ("2018-01-04", "BUY", "SZ000001"),
+        ])
+        self.assertTrue(engine.tables["orders"].status.eq("FILLED").all())
+        self.assertAlmostEqual(engine.account["portfolio_value"], 1100.0)
+
+    def test_constant_scores_count_as_zero_in_rankic_metrics_and_exports(self):
+        for mixed in (False, True):
+            with self.subTest(mixed=mixed):
+                def inference(as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
+                    scores = [1.0, 2.0] if mixed and as_of_date == "2018-01-04" else [0.0, 0.0]
+                    return pd.DataFrame({"date": as_of_date, "code": ["SH600000", "SZ000001"],
+                                         "score": scores})
+
+                output = self.root / ("mixed-scores" if mixed else "constant-scores")
+                engine = self.engine(inference=inference, friendly_output=False, output_dir=output)
+                metrics = engine.run()
+                expected = [0.0, 1.0] if mixed else [0.0, 0.0]
+                for actual, wanted in zip(engine.tables["rankic"].rankic, expected):
+                    self.assertAlmostEqual(actual, wanted)
+                self.assertEqual(engine.tables["rankic"].n_stocks.tolist(), [2, 2])
+                self.assertAlmostEqual(metrics["mean_rankic"], 0.5 if mixed else 0.0)
+                self.assertAlmostEqual(metrics["rankic_std"], 0.5 ** 0.5 if mixed else 0.0)
+                self.assertEqual(metrics["positive_rankic_ratio"], 0.5 if mixed else 0.0)
+                if mixed:
+                    self.assertAlmostEqual(metrics["rankic_ir"], 0.5 ** 0.5)
+                else:
+                    self.assertIsNone(metrics["rankic_ir"])
+                saved = json.loads((output / "metrics.json").read_text(encoding="utf-8"))
+                self.assertEqual(saved, metrics)
+                exported = pd.read_csv(output / "rankic.csv")
+                for actual, wanted in zip(exported.rankic, expected):
+                    self.assertAlmostEqual(actual, wanted)
+
     def test_rankic_and_rankicir_use_full_universe_independently_of_top_k(self):
         for name in SOURCE_COLUMNS:
             path = self.root / name / "2018/01/201801.parquet"
@@ -190,6 +281,7 @@ class FinancialIntegrationTest(unittest.TestCase):
                 for column in ("open", "high", "low", "close"):
                     third[column] = [10., 10., 11., 20., 23., 23.]
             pd.concat([frame, third], ignore_index=True).to_parquet(path, index=False)
+        write_raw_open(self.root)
 
         def inference(as_of_date: str, data: dict[str, pd.DataFrame]) -> pd.DataFrame:
             return pd.DataFrame({
@@ -293,7 +385,7 @@ class FinancialIntegrationTest(unittest.TestCase):
         self.assertAlmostEqual(equity.benchmark_nav.iloc[-1], .9880893)
         self.assertAlmostEqual(metrics["annualized_excess_return"], .3319107)
         self.assertAlmostEqual(metrics["tracking_error"], stdev(expected_active) * 2)
-        self.assertAlmostEqual(metrics["information_ratio"], mean(expected_active) / stdev(expected_active) * 2)
+        self.assertAlmostEqual(metrics["information_ratio"], .3319107 / (stdev(expected_active) * 2))
         for label in ("年化超额收益率", "跟踪误差", "信息比率"):
             row = next(line for line in output.getvalue().splitlines() if label in line)
             self.assertNotIn("N/A", row)

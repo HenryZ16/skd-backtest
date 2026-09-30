@@ -98,7 +98,38 @@ class MetricsTests(unittest.TestCase):
         ]))
         self.assertAlmostEqual(metrics["annualized_excess_return"], 0.33)
         self.assertAlmostEqual(metrics["tracking_error"], 0.1)
-        self.assertAlmostEqual(metrics["information_ratio"], 3.0)
+        self.assertAlmostEqual(metrics["information_ratio"], 3.3)
+
+    def test_information_ratio_handles_zero_and_negative_annualized_excess_return(self):
+        for final_nav in (1.1, 0.9025):
+            with self.subTest(final_nav=final_nav):
+                second_return = final_nav / 0.95 - 1.0
+                metrics = self.calculate(make_tables(equity=[
+                    equity_row("2024-01-02", -0.05, 0.95, benchmark_return=0.0,
+                               benchmark_nav=1.0, active_return=-0.05),
+                    equity_row("2024-01-03", second_return, final_nav, benchmark_return=0.1,
+                               benchmark_nav=1.1, active_return=second_return - 0.1),
+                ]), trading_days_per_year=4)
+                expected_excess = final_nav ** 2 - 1.1 ** 2
+                expected_tracking_error = abs(second_return - 0.1 + 0.05) / 2 ** 0.5 * 2
+                self.assertAlmostEqual(metrics["annualized_excess_return"], expected_excess)
+                self.assertAlmostEqual(metrics["tracking_error"], expected_tracking_error)
+                self.assertAlmostEqual(metrics["information_ratio"], expected_excess / expected_tracking_error)
+
+    def test_information_ratio_requires_valid_annualized_excess_return(self):
+        for missing in ("portfolio_nav", "benchmark_nav"):
+            with self.subTest(missing=missing):
+                final = equity_row("2024-01-03", 0.3, 1.43, benchmark_return=0.1,
+                                   benchmark_nav=1.1, active_return=0.2)
+                final[missing] = None
+                metrics = self.calculate(make_tables(equity=[
+                    equity_row("2024-01-02", 0.1, 1.1, benchmark_return=0.0,
+                               benchmark_nav=1.0, active_return=0.1),
+                    final,
+                ]))
+                self.assertAlmostEqual(metrics["tracking_error"], 0.1)
+                self.assertIsNone(metrics["annualized_excess_return"])
+                self.assertIsNone(metrics["information_ratio"])
 
     def test_missing_benchmark_keeps_all_benchmark_metrics_none(self):
         metrics = self.calculate(make_tables(equity=[

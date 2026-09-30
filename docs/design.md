@@ -49,6 +49,15 @@ DailyData 包含开盘行情、收盘行情、可选研究窗口与当日 Barra 
 只有研究窗口交给模型。市场数据仍直接传入相应组件，行情预取线程不访问运行缓存。
 独立 `valuation_inputs()` 用自己的读数状态提供区间行情，不计算收益、不干扰播放。
 
+后复权 open_market 必须调用 adjusted_limits.py 中的限价推算，不提供开关。
+该模块独立按月读取 MarketDataRawOpen 的 open 与 Factor33_winsor 的 is_st，按日期/代码对齐并仅保留一个月缓存。
+使用当天 adjusted_open/raw_open 比例将历史前收盘参考价还原到分，按板块、历史日期和 ST 标记计算原价上下限，
+以 ROUND_HALF_UP 取至 0.01 元并保证至少一分钱的变动，再转回后复权口径。
+不会读取当日 high/low/close 决定能否成交；研究、原价标签、真实价格模式和独立收盘估值不依赖此模块。
+缺少所需数据不回退为不限制交易；历史参考价不足时 Broker 以 MISSING_PRICE_LIMIT 拒单。
+涨停只限制买入、跌停只限制卖出，卖出失败后的买入仍受实际现金约束。
+这条仅针对 1.0.x 的临时路径未重建新股上市等特殊交易安排，具体推算边界见使用说明。
+
 真实价格模式支持月文件中的 raw OHLC 或 adjustment_factor（adjusted = raw × factor），
 并要求提供当日 upper_limit/lower_limit；缺失必需字段或关键数据明确失败。
 研究输入仍只保留原 SOURCE_COLUMNS，新增执行字段不进入模型。
@@ -155,7 +164,7 @@ Engine 使用 console.py 展示默认启用的交易日进度和结果表；展�
 | 独占文件（均在 src/skd_backtest/） | 当前状态与剩余职责 |
 |---|---|
 | contracts.py、runtime_cache.py、config.py、schemas.py、engine.py、inference_pipeline.py、console.py、__init__.py | 公共类型、缓存、配置、接线及控制台展示已落地 |
-| data_provider.py | 后复权与真实市场播放、复权因子恢复、历史参考价和限价适配 |
+| data_provider.py、adjusted_limits.py | 市场播放、历史参考价；后复权模式的强制限价推算与隔离读取，真实价格模式维持既有来源 |
 | submission_runner.py | 标准提交加载、每次评测的模型及随机状态、推理校验；缓存发布仅在主线程执行 |
 | reference_data.py | 精确日期的外部基准、权重和行业读取；合法池对齐 |
 | label_provider.py | 独立按交易日读取端点价格，计算标签并保留缺失原因 |

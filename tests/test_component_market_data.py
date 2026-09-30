@@ -3,8 +3,11 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
+
+from market_fixtures import write_raw_open
 
 from skd_backtest.config import BacktestConfig
 from skd_backtest.data_provider import DataProvider
@@ -64,6 +67,8 @@ class MarketDataComponentTest(unittest.TestCase):
                 folder = root / name / str(month)[:4] / str(month)[4:]
                 folder.mkdir(parents=True, exist_ok=True)
                 part.to_parquet(folder / f"{month}.parquet", index=False)
+
+        write_raw_open(root)
 
     def config(self, root, *, price_mode="raw_price",
                start="2021-01-04", end="2021-01-05", prefetch=False,
@@ -202,6 +207,16 @@ class MarketDataComponentTest(unittest.TestCase):
                 with provider, self.assertRaisesRegex(ValueError, expected):
                     provider.prepare()
                     provider.open_market("2021-01-04")
+
+    def test_raw_mode_and_close_only_valuation_never_read_raw_open_bridge(self):
+        self.write_market(self.root)
+        with patch("pandas.read_parquet", wraps=pd.read_parquet) as read:
+            with DataProvider(self.config(self.root)) as provider:
+                provider.prepare()
+                provider.open_market("2021-01-04")
+            with DataProvider(self.config(self.root, price_mode="adjusted_return")) as provider:
+                self.assertFalse(provider.valuation_inputs().empty)
+            self.assertTrue(all("MarketDataRawOpen" not in str(call.args[0]) for call in read.call_args_list))
 
     def test_missing_raw_price_fields_reject_raw_mode(self):
         self.write_market(self.root, include_raw=False)

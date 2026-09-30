@@ -12,6 +12,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from .adjusted_limits import AdjustedLimitProvider
 from .config import BacktestConfig
 from .schemas import SOURCE_COLUMNS
 
@@ -78,6 +79,8 @@ class DataProvider:
     def __init__(self, config: BacktestConfig, *, load_research: bool = True):
         self.config = config
         self.load_research = load_research
+        self._adjusted_limits = (AdjustedLimitProvider(config.data_dir)
+                                 if config.price_mode == "adjusted_return" else None)
         self._datasets = dict(SOURCE_COLUMNS) if load_research else {
             "MarketData": ("日期", "代码", "open", "close", "is_suspend"),
         }
@@ -112,6 +115,8 @@ class DataProvider:
         self._pending = None
         self._tables = {}
         self._price_state = None
+        if self._adjusted_limits is not None:
+            self._adjusted_limits.close()
         self._prepared_dates = None
         self._playing = False
 
@@ -179,7 +184,7 @@ class DataProvider:
             "source_rows": {name: 0 for name in SOURCE_COLUMNS},
             "delivered_rows": {name: 0 for name in SOURCE_COLUMNS},
             "warmup_days": 0,
-            "seed_files": 0, "seed_rows": 0,
+            "seed_files": 0, "seed_rows": 0, "limit_files": 0,
             "open_rows": 0, "close_rows": 0, "market_seconds": 0.0,
         }
         self._batch_index = -1
@@ -369,6 +374,9 @@ class DataProvider:
             columns={"代码": "code", self._market_open_column: self._market_open_label,
                      "is_suspend": "is_suspended"},
         ).assign(date=date)
+        if self._adjusted_limits is not None:
+            result = self._adjusted_limits.apply(date, result)
+            self.stats["limit_files"] = self._adjusted_limits.files_read
         self.stats["open_rows"] += len(result)
         self.stats["market_seconds"] += perf_counter() - started
         return result

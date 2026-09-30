@@ -95,7 +95,7 @@ class PredictionEvaluatorTest(unittest.TestCase):
         pd.testing.assert_frame_equal(scores, original_scores)
         pd.testing.assert_frame_equal(labels, original_labels)
 
-    def test_single_pair_and_zero_rank_variance_return_none(self):
+    def test_constant_scores_are_zero_but_small_samples_and_constant_returns_are_none(self):
         scores = pd.DataFrame(
             [
                 ("2024-02-01", "A", 1.0),
@@ -103,6 +103,10 @@ class PredictionEvaluatorTest(unittest.TestCase):
                 ("2024-02-02", "B", 1.0),
                 ("2024-02-03", "A", 1.0),
                 ("2024-02-03", "B", 2.0),
+                ("2024-02-04", "A", 5.0),
+                ("2024-02-04", "B", 5.0),
+                ("2024-02-05", "A", 0.0),
+                ("2024-02-05", "B", 0.0),
             ],
             columns=("date", "code", "score"),
         )
@@ -113,14 +117,16 @@ class PredictionEvaluatorTest(unittest.TestCase):
                 ("2024-02-02", "B", 0.2),
                 ("2024-02-03", "A", 0.2),
                 ("2024-02-03", "B", 0.2),
+                ("2024-02-04", "A", 0.1),
+                ("2024-02-04", "B", 0.1),
             ],
             columns=("date", "code", "future_return"),
         )
 
         result = evaluate(scores, labels).published[Topic.EVALUATION_PREDICTION, None]
 
-        self.assertEqual(result.rankic.n_stocks.tolist(), [1, 2, 2])
-        self.assertTrue(result.rankic.rankic.isna().all())
+        self.assertEqual(result.rankic.n_stocks.tolist(), [1, 2, 2, 2, 0])
+        self.assertEqual(result.rankic.rankic.tolist(), [None, 0.0, None, 0.0, None])
 
     def test_empty_scores_publish_exact_empty_schemas(self):
         scores = pd.DataFrame(columns=("date", "code", "score"))

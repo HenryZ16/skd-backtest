@@ -140,7 +140,7 @@ class BrokerTest(unittest.TestCase):
         market = pd.DataFrame([
             (date, "OLD", 10.0, True, False),
             (date, "NEW", 5.0, False, False),
-        ], columns=("date", "code", "adjusted_open", "is_suspended", "is_missing"))
+        ], columns=("date", "code", "adjusted_open", "is_suspended", "is_missing")).assign(upper_limit=100.0, lower_limit=0.01)
 
         result = run_execution(
             broker, cache, date, market,
@@ -256,6 +256,62 @@ class BrokerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "upper_limit"):
             run_execution(broker, cache, date, missing_field)
 
+    def test_adjusted_limits_block_only_the_restricted_side(self):
+        for side, opening, rejected in (
+            ("BUY", 11.06, "LIMIT_UP"), ("SELL", 11.06, None),
+            ("BUY", 9.05, None), ("SELL", 9.05, "LIMIT_DOWN"),
+            ("BUY", 11.05, None), ("SELL", 9.06, None),
+            ("BUY", 11.06 - 1e-14, "LIMIT_UP"),
+        ):
+            with self.subTest(side=side, opening=opening):
+                date = DATES[1]
+                positions = [("SEC", 1000.0, opening, DATES[0])] if side == "SELL" else []
+                account = state("adjusted_return", 0.0 if positions else 1000.0, positions)
+                values = [("SEC", opening, date, 1000.0)] if positions else []
+                cache = ExchangeCache()
+                set_open(cache, date, account, 1000.0, values,
+                         target_plan(date, [("SEC", 0.0 if positions else 1.0)]))
+                market = pd.DataFrame([dict(code="SEC", adjusted_open=opening, is_suspended=False,
+                                           is_missing=False, upper_limit=11.06, lower_limit=9.05)])
+                result = run_execution(Broker(config("adjusted_return")), cache, date, market)
+                if rejected:
+                    self.assertEqual(result.orders.iloc[0].reject_reason, rejected)
+                    self.assertTrue(result.trades.empty)
+                    self.assertFalse(cache.requests)
+                else:
+                    self.assertEqual(result.orders.iloc[0].status, "FILLED")
+                    self.assertEqual(result.trades.iloc[0].side, side)
+
+    def test_adjusted_missing_limits_cannot_silently_allow_trading(self):
+        date = DATES[1]
+        cache = ExchangeCache()
+        set_open(cache, date, state("adjusted_return", 1000.0), 1000.0, [],
+                 target_plan(date, [("SEC", 1.0)]))
+        market = pd.DataFrame([dict(code="SEC", adjusted_open=10.0, is_suspended=False,
+                                   is_missing=False, upper_limit=None, lower_limit=None)])
+        result = run_execution(Broker(config("adjusted_return")), cache, date, market)
+        self.assertEqual(result.orders.iloc[0].reject_reason, "MISSING_PRICE_LIMIT")
+        self.assertTrue(result.trades.empty)
+        with self.assertRaisesRegex(ValueError, "upper_limit"):
+            run_execution(Broker(config("adjusted_return")), cache, date, market.drop(columns="upper_limit"))
+
+    def test_adjusted_limit_down_sell_keeps_holding_and_buy_uses_remaining_cash(self):
+        date = DATES[1]
+        cache = ExchangeCache()
+        set_open(cache, date, state("adjusted_return", 200.0, [("OLD", 800.0, 9.0, DATES[0])]),
+                 1000.0, [("OLD", 9.0, date, 800.0)],
+                 target_plan(date, [("OLD", 0.0), ("NEW", 1.0)]))
+        market = pd.DataFrame([
+            dict(code="OLD", adjusted_open=9.0, upper_limit=11.0, lower_limit=9.0),
+            dict(code="NEW", adjusted_open=10.0, upper_limit=11.0, lower_limit=9.0),
+        ]).assign(is_suspended=False, is_missing=False)
+        result = run_execution(Broker(config("adjusted_return")), cache, date, market)
+        self.assertEqual(result.orders.reject_reason.iloc[0], "LIMIT_DOWN")
+        self.assertEqual(result.orders.status.tolist(), ["REJECTED", "PARTIALLY_FILLED"])
+        self.assertAlmostEqual(result.trades.position_value.iloc[0], 200.0)
+        self.assertEqual(set(result.account.positions.code), {"OLD", "NEW"})
+        self.assertGreaterEqual(result.account.cash, 0.0)
+
     def test_adjusted_buy_uses_quotes_to_find_minimum_fee_boundary(self):
         broker = Broker(config("adjusted_return", initial_cash=5.01))
         date = DATES[1]
@@ -269,7 +325,7 @@ class BrokerTest(unittest.TestCase):
         market = pd.DataFrame([
             (date, "OLD", 10.0, True, False),
             (date, "NEW", 10.0, False, False),
-        ], columns=("date", "code", "adjusted_open", "is_suspended", "is_missing"))
+        ], columns=("date", "code", "adjusted_open", "is_suspended", "is_missing")).assign(upper_limit=100.0, lower_limit=0.01)
 
         result = run_execution(
             broker, cache, date, market,
@@ -296,7 +352,7 @@ class BrokerTest(unittest.TestCase):
         market = pd.DataFrame([
             (date, "OLD", 10.0, True, False),
             (date, "NEW", 10.0, False, False),
-        ], columns=("date", "code", "adjusted_open", "is_suspended", "is_missing"))
+        ], columns=("date", "code", "adjusted_open", "is_suspended", "is_missing")).assign(upper_limit=100.0, lower_limit=0.01)
 
         result = run_execution(
             broker, cache, date, market,

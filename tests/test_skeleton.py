@@ -9,6 +9,8 @@ from unittest.mock import patch
 
 import pandas as pd
 
+from market_fixtures import write_raw_open
+
 from skd_backtest import BacktestEngine
 from skd_backtest.schemas import METRIC_NAMES, RESULT_COLUMNS, SOURCE_COLUMNS
 from protocol_support import protocol_components
@@ -33,6 +35,7 @@ class SkeletonTest(unittest.TestCase):
                         row.update(日期=day, 代码=code, 名称=code)
                         rows.append(row)
                 pd.DataFrame(rows).to_parquet(folder / f"{month}.parquet", index=False)
+        write_raw_open(self.root)
         self.dates = ["2018-01-02", "2018-01-03", "2018-01-04", "2018-01-05", "2018-01-08"]
         self.calls = []
         benchmark = self.root / "HS300_index" / "benchmark.csv"
@@ -56,7 +59,7 @@ class SkeletonTest(unittest.TestCase):
         engine = self.make_engine(initial_cash=123.0)
         with protocol_components(engine) as trace, patch("pandas.read_parquet", wraps=pd.read_parquet) as read:
             metrics = engine.run()
-            self.assertEqual(read.call_count, 8)  # prepare followed by playback does not repeat the calendar.
+            self.assertEqual(read.call_count, 10)  # prepare followed by playback does not repeat the calendar.
             self.assertEqual(engine.trading_dates, self.dates)
             self.assertEqual(self.calls, ["2018-01-02", "2018-01-04"])
             self.assertEqual(set(metrics), set(METRIC_NAMES))

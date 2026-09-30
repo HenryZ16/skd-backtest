@@ -204,6 +204,7 @@ top_k = 50
 <data_dir>/Factor33_winsor/<YYYY>/<MM>/<YYYYMM>.parquet
 <data_dir>/Barra_factor/<YYYY>/<MM>/<YYYYMM>.parquet
 <data_dir>/MarketData/<YYYY>/<MM>/<YYYYMM>.parquet
+<data_dir>/MarketDataRawOpen/<YYYY>/<MM>/<YYYYMM>.parquet  # 后复权开盘执行必需的原始 open
 <data_dir>/HS300_weight/<YYYY>/hs300_weight_<YYYY>.csv
 <data_dir>/HS300_industry/<YYYY>/hs300_industry_<YYYY>.csv
 <data_dir>/HS300_index/<YYYY>/hs300_index_<YYYY>.csv    # 必需指数日线，GBK / UTF-8
@@ -216,7 +217,8 @@ NaN 保持不变，不补值、不重新缩尾或拟合变换。推理结果的 
 YYYY-MM-DD 字符串，`code` 保留市场前缀。
 
 引擎专用行情保留年度并集，以便后续继续处理已调出成分的持仓：
-开盘列为 `date/code/adjusted_open/is_suspended/is_missing/previous_close/previous_close_date`。
+开盘列为 `date/code/adjusted_open/is_suspended/is_missing/previous_close/previous_close_date/upper_limit/lower_limit`；
+其中上下限与 adjusted_open 同为后复权口径。
 收盘列为 `date/code/adjusted_close/is_suspended/is_missing/has_valid_close/previous_close/`
 `previous_close_date/reference_close/reference_date/is_stale`。
 
@@ -234,14 +236,14 @@ YYYY-MM-DD 字符串，`code` 保留市场前缀。
 基准权重和行业数据缺失时，通过 Dataset(status="unavailable", data=None, reason=...) 表达，
 不使用空表或等权假冒真实数据。DailyData.portfolio 仅承载当日 Barra，其他参考输入由 Reference Data 发布。
 
-依据现有 `D:\Data\README.md`：
+当前数据约定：
 
 - Barra 是每日真实沪深300成分；Factor33 和 MarketData 是当年度成分并集。
   研究输入已按逐日 Barra 成分过滤，当前合法股票池由当日 Barra 定义。
 - 财务因子的披露日 PIT 和源数据预处理依赖数据生产方；本层只按已有日期和成分过滤，
   不从日频因子文件重新构建财报披露版本。
-- OHLC 是后复权价；当前文件未提供真实 OHLC/复权因子、涨跌停限价、
-  历史基准权重和行业数据。默认模式因此是 `adjusted_return`。
+- MarketData 的 OHLC 是后复权价；MarketDataRawOpen 独立提供未复权开盘价，字段仅为
+  `日期、代码、open`。当前文件未提供完整真实 OHLC、复权因子和涨跌停限价；默认交易模式为 `adjusted_return`。
 - `raw_price` 已支持真实股数、T+1、整手买入和涨跌停单边限制；须补齐以下数据，
   不从 `amount/volume` 推造开盘价。
 
@@ -261,6 +263,36 @@ previous_close 和 reference_close 也使用原价体系。研究窗口始终只
 
 `label_price_basis` 独立选择 adjusted_open 或 raw_open；后者逐文件识别 raw_open 或 open + adjustment_factor，
 但不要求将交易模式切换为 raw_price。
+
+1.0.x 的后复权开盘执行强制使用 MarketDataRawOpen 推算涨跌停价，没有开关。
+该数据只用于后复权交易限制，不进入模型、标签计算或真实价格回测；这条临时推算路径后续可能移除。
+每个执行月份分别读取 MarketDataRawOpen 的 `日期、代码、open` 和 Factor33_winsor 的 `日期、代码、is_st`，
+按日期和代码对齐，包含已调出当日成分的持仓；仅缓存一个月。`limit_files` 单独统计这两类辅助读取，
+`data_files` 仍统计原三套完整数据。独立的收盘估值 API 不读取这些辅助数据。
+
+常规涨跌幅按股票代码与日期确定：沪深主板（SH60、SZ00）为 10%，其中 `is_st=1` 为 5%；
+科创板（SH688）为 20%；创业板（SZ30）自 2020-08-24 起为 20%，此前按 10%／ST 5% 处理。
+is_st 使用原字段的 0/1，不按股票名称推断，也不根据当日 high/low/close 推断交易状态。
+创业板切换日期见[深交所说明](https://www.szse.cn/aboutus/trends/news/t20200821_580924.html)。
+
+推算顺序如下，所有金额舍入均用十进制 ROUND_HALF_UP：
+
+1. `f = adjusted_open / raw_open`，比例保持精度。
+2. 用 `previous_close / f` 估计当天原价口径的前收盘参考价，并四舍五入恢复到分。
+3. 分别乘以 `1+r` 和 `1-r`，四舍五入到 0.01 元；若与参考价相差不足一分钱，至少增减一分钱，最低价不低于 0.01 元。
+4. 两个原价限价乘以 `f`，得到后复权上下限；这一步不再按原价的 0.01 元取整。
+
+涨跌停的舍入与最小变动规则见[深交所说明](https://investor.szse.cn/knowledge/stock/deal/t20180801_553961.html)。
+例如参考价 10.05 元、涨跌幅 10% 时，原价上限为 11.06、下限为 9.05；不能使用 Python round 的银行家舍入，
+也不能将跌停价算成参考价除以 1.10。
+
+Broker 用后复权开盘价与后复权限价比较：涨停拒绝买入、跌停拒绝卖出，另一方向正常判断；
+比较只容忍换算产生的浮点误差，不使用半分钱等宽容差。卖出失败保留持仓，后续买入只使用实际可用现金。
+缺少月文件、可交易行 raw open 缺失/非正/非有限、is_st 无效或日期代码重复均明确报错；
+缺少历史前收盘参考价时上下限为空，需要成交的订单以 `MISSING_PRICE_LIMIT` 拒绝，不静默放行。
+
+该路径按现有比例后复权数据估计常规限价，不等同于交易所原始限价数据。
+它依赖源价格与 is_st 的准确性，未重建新股无涨跌幅期、重新上市、退市整理等特殊交易安排。
 
 ## 独立数据 API
 
@@ -449,7 +481,8 @@ HS300_industry 存在时自动读取，启用行业约束只需配置
 性能测试脚本显式关闭友好输出，保留 JSON 解析和性能测量方式。
 
 `engine.run()` 返回以下扁平字典，`engine.metrics` 保存该结果。
-None 表示没有有效样本或比率未定义。示例的模型分数全部相同，因此 RankIC 相关指标为 None；组合收益仍正常计算。
+None 表示没有足够有效样本或比率未定义。示例的模型分数全部相同，至少两只有效配对的信号日 RankIC 记为 0；
+存在有效日时 Mean RankIC 和正值比例为 0，至少两个有效日时 RankIC 标准差为 0，RankICIR 因分母为零仍为 None。
 数据、模型或协议发生真实错误时仍会抛出异常，并保持 metrics=None、tables/account 为空。
 
 | 键 | 规格指标 |
@@ -479,7 +512,8 @@ predictions 保留所有信号日分数与独立计算的未来收益；缺价�
 future_return 为空，不删除预测记录。每个信号日的 RankIC 面向当日合法股票池的全截面，
 使用全部有效 score / future_return 配对的平均并列排名计算；不按 Top-K、目标权重或实际持仓筛选，
 也不受是否成交影响。top_k 只决定组合选股数量，不改变 RankIC 或 RankICIR。
-rankic 表中的 n_stocks 记录该日全截面的有效配对数。
+rankic 表中的 n_stocks 记录该日全截面的有效配对数。至少两只有效配对且 score 全部相等时，
+RankIC 记为 0 并参与汇总；不足两只，或 score 有差异但标签全部相等时，RankIC 为空。
 标签只在事后读取，可越过回测 end_date 取得持有期终点，模型不会收到未来价格。
 
 target_weights 记录目标，orders/trades 记录真实执行结果，positions/equity_curve 记录实际持仓与逐日账户。
@@ -488,6 +522,8 @@ target_weights 记录目标，orders/trades 记录真实执行结果，positions
 
 标准差采用样本标准差，RankICIR 不年化。年化收益以全部回测交易日数计算；
 最大回撤包含初始 NAV=1，按非负损失比例表示；年化超额收益为组合年化收益减基准年化收益。
+信息比率 `information_ratio = annualized_excess_return / tracking_error`；
+tracking_error 为日主动收益的样本标准差乘以年化因子，分母为零或所需值无效时信息比率为 None。
 turnover 是每日双边成交现金对价 / 当日开盘交易前权益的合计；failed_orders 只计完全拒绝，
 部分成交由订单表记录。完整公式见[接口协议](interfaces.md)。
 

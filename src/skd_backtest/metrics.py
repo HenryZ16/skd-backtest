@@ -147,13 +147,12 @@ class Metrics:
                 )
 
             active_returns = _values(equity_curve["active_return"])
-            active_mean = _mean(active_returns)
             active_std = _sample_std(active_returns)
             if active_std is not None:
                 tracking_error = _plain_number(active_std * self._annualization_factor)
-                if active_mean is not None and active_std != 0.0:
+                if annualized_excess_return is not None and tracking_error not in (None, 0.0):
                     information_ratio = _plain_number(
-                        active_mean / active_std * self._annualization_factor
+                        annualized_excess_return / tracking_error
                     )
 
         sharpe_ratio = None

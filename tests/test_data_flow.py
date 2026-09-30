@@ -9,6 +9,8 @@ import unittest
 from unittest.mock import patch
 
 import pandas as pd
+
+from market_fixtures import write_raw_open
 from pandas.testing import assert_frame_equal
 
 from skd_backtest import BacktestEngine
@@ -39,6 +41,7 @@ class DataFlowTest(unittest.TestCase):
                         row.update(open=float(index + 10), close=float(index + 11), is_suspend=0)
                     if name == "Factor33_winsor":
                         row["pe_ttm"] = float("nan")
+                        row["is_st"] = 0
                     rows.append(row)
             table = pd.DataFrame(rows, columns=columns)
             self.source[name] = table
@@ -47,6 +50,7 @@ class DataFlowTest(unittest.TestCase):
                 folder.mkdir(parents=True)
                 part.iloc[::-1].to_parquet(folder / f"{month}.parquet", index=False)
 
+        write_raw_open(self.root)
         benchmark = self.root / "HS300_index" / "benchmark.csv"
         benchmark.parent.mkdir()
         pd.DataFrame({"date": pd.to_datetime(pd.Series(self.days).astype(str)).dt.strftime("%Y-%m-%d"),
@@ -83,7 +87,8 @@ class DataFlowTest(unittest.TestCase):
                         self.assertEqual(market["code"].tolist(), expected_market["代码"].tolist())
                         self.assertEqual(market["adjusted_open"].tolist(), expected_market["open"].tolist())
                         self.assertEqual(set(market), {"date", "code", "adjusted_open", "is_suspended",
-                                                       "is_missing", "previous_close", "previous_close_date"})
+                                                       "is_missing", "previous_close", "previous_close_date",
+                                                       "upper_limit", "lower_limit"})
                         self.assertEqual(
                             provider.close_market(date)["adjusted_close"].tolist(),
                             expected_market["close"].tolist(),
@@ -111,7 +116,9 @@ class DataFlowTest(unittest.TestCase):
                 # Every full monthly dataset is read exactly once; no daily reads.
                 self.assertEqual(provider.stats["data_files"], 15)
                 self.assertEqual(provider.stats["batches"], 5)
-                paths = [str(call.args[0]) for call in read.call_args_list]
+                self.assertEqual(provider.stats["limit_files"], 8)
+                paths = [str(call.args[0]) for call in read.call_args_list
+                         if call.kwargs.get("columns") != ["日期", "代码", "is_st"]]
                 self.assertEqual(len(paths), len(set(paths)))
             self.assertIsNone(provider._executor)
             self.assertFalse(provider._tables)

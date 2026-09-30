@@ -154,9 +154,7 @@ class Broker:
             raise ValueError("target weights cannot exceed 1")
 
         open_column = "raw_open" if account.price_mode == "raw_price" else "adjusted_open"
-        required_market = ("code", open_column, "is_suspended", "is_missing")
-        if account.price_mode == "raw_price":
-            required_market += ("upper_limit", "lower_limit")
+        required_market = ("code", open_column, "is_suspended", "is_missing", "upper_limit", "lower_limit")
         try:
             market_columns = {name: market.columns.get_loc(name) for name in required_market}
         except KeyError as exc:
@@ -216,7 +214,7 @@ class Broker:
                 reason = "MISSING_OPEN"
             else:
                 reason = None
-            if reason is None and account.price_mode == "raw_price":
+            if reason is None:
                 upper = _finite_number(row[market_indexes["upper_limit"]])
                 lower = _finite_number(row[market_indexes["lower_limit"]])
             else:
@@ -244,9 +242,13 @@ class Broker:
                     continue
                 side = "BUY" if difference > 0 else "SELL"
                 reason = market_reason
-                if reason is None and side == "BUY" and upper is not None and open_price >= upper:
+                if reason is None and (upper is None or lower is None or lower <= 0 or upper <= lower):
+                    reason = "MISSING_PRICE_LIMIT"
+                if reason is None and side == "BUY" and (
+                        open_price >= upper or isclose(open_price, upper, rel_tol=1e-12, abs_tol=0.0)):
                     reason = "LIMIT_UP"
-                elif reason is None and side == "SELL" and lower is not None and open_price <= lower:
+                elif reason is None and side == "SELL" and (
+                        open_price <= lower or isclose(open_price, lower, rel_tol=1e-12, abs_tol=0.0)):
                     reason = "LIMIT_DOWN"
                 intents.append({
                     "code": code, "side": side, "shares": None,

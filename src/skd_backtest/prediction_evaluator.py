@@ -29,11 +29,12 @@ class PredictionEvaluator:
             score_rank = score.loc[finite].rank(method="average")
             return_rank = future_return.loc[finite].rank(method="average")
             n_stocks = len(score_rank)
-            rankic = (
-                score_rank.corr(return_rank)
-                if n_stocks >= 2 and score_rank.nunique() > 1 and return_rank.nunique() > 1
-                else None
-            )
+            rankic = None
+            if n_stocks >= 2:
+                if score_rank.nunique() == 1:
+                    rankic = 0.0
+                elif return_rank.nunique() > 1:
+                    rankic = score_rank.corr(return_rank)
             rankic_rows.append((date, rankic, n_stocks))
 
         predictions = predictions.loc[:, RESULT_COLUMNS["predictions"]].reset_index(drop=True)
